@@ -1,0 +1,46 @@
+name: Android Debug Build
+
+# Builds the fork on GitHub's runners because Gradle's daemon loopback
+# TCP is blocked in the local dev VM. Runs on every push to master and
+# on manual dispatch. Produces a debug APK as a downloadable artifact.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1" "platform-tools"
+          yes | sdkmanager --licenses
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build debug APK
+        run: ./gradlew :TMessagesProj_App:assembleAfatDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-afat-debug
+          path: TMessagesProj_App/build/outputs/apk/afat/debug/*.apk
+          if-no-files-found: error
