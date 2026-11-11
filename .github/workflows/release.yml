@@ -40,6 +40,11 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          # TG: cache disabled after 6 consecutive builds died mid-compile
+          # with the runner losing communication (no logs); rules out a
+          # corrupt/oversize Gradle cache and lowers runner memory pressure.
+          cache-disabled: true
 
       - name: Inject Telegram API credentials
         run: |
@@ -71,7 +76,7 @@ jobs:
           echo "google-services.json restored"
 
       - name: Build release APK and AAB
-        run: ./gradlew :TMessagesProj_App:assembleAfatRelease :TMessagesProj_App:bundleAfatRelease --stacktrace -PRELEASE_STORE_PASSWORD="$TG_KEYSTORE_PASSWORD" -PRELEASE_KEY_PASSWORD="$TG_KEY_PASSWORD" -PRELEASE_KEY_ALIAS=tg-release
+        run: ./gradlew :TMessagesProj_App:assembleAfatRelease :TMessagesProj_App:bundleAfatRelease --stacktrace --max-workers=2 -PRELEASE_STORE_PASSWORD="$TG_KEYSTORE_PASSWORD" -PRELEASE_KEY_PASSWORD="$TG_KEY_PASSWORD" -PRELEASE_KEY_ALIAS=tg-release
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
