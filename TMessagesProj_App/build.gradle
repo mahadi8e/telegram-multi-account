@@ -194,10 +194,7 @@ android {
     }
 }
 
-// NOTE: the google-services plugin was removed for this fork (Step 2).
-// The stock google-services.json belonged to Telegram's own Firebase
-// project (tmessages2) and must not ship in the fork. To enable Firebase
-// push (FCM), create your own Firebase project, add an Android app with
-// package com.tg.messenger, download ITS google-services.json into this
-// folder, and re-add this line:
-// apply plugin: 'com.google.gms.google-services'
+// Firebase push (FCM) enabled for this fork with the user's own project.
+// google-services.json is NOT committed (public repo) — the build restores
+// it from the TG_GOOGLE_SERVICES_JSON GitHub Secret at build time.
+apply plugin: 'com.google.gms.google-services'

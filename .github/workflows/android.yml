@@ -47,6 +47,17 @@ jobs:
           grep -q "public static int APP_ID = $TG_API_ID;" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_ID injected"
           grep -q "APP_HASH" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_HASH line present"
 
+      - name: Restore google-services.json
+        env:
+          TG_GOOGLE_SERVICES_JSON: ${{ secrets.TG_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$TG_GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::TG_GOOGLE_SERVICES_JSON secret is not set on this repo"
+            exit 1
+          fi
+          echo "$TG_GOOGLE_SERVICES_JSON" | base64 -d > TMessagesProj_App/google-services.json
+          echo "google-services.json restored"
+
       - name: Build debug APK
         run: ./gradlew :TMessagesProj_App:assembleAfatDebug --stacktrace
 

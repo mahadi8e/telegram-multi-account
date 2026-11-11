@@ -18,6 +18,7 @@ jobs:
       TG_KEYSTORE_BASE64: ${{ secrets.TG_KEYSTORE_BASE64 }}
       TG_KEYSTORE_PASSWORD: ${{ secrets.TG_KEYSTORE_PASSWORD }}
       TG_KEY_PASSWORD: ${{ secrets.TG_KEY_PASSWORD }}
+      TG_GOOGLE_SERVICES_JSON: ${{ secrets.TG_GOOGLE_SERVICES_JSON }}
     steps:
       - name: Checkout with submodules
         uses: actions/checkout@v4
@@ -59,6 +60,15 @@ jobs:
           fi
           echo "$TG_KEYSTORE_BASE64" | base64 -d > TMessagesProj/config/release.keystore
           echo "keystore restored: $(stat -c%s TMessagesProj/config/release.keystore) bytes"
+
+      - name: Restore google-services.json
+        run: |
+          if [ -z "$TG_GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::TG_GOOGLE_SERVICES_JSON secret is not set on this repo"
+            exit 1
+          fi
+          echo "$TG_GOOGLE_SERVICES_JSON" | base64 -d > TMessagesProj_App/google-services.json
+          echo "google-services.json restored"
 
       - name: Build release APK and AAB
         run: ./gradlew :TMessagesProj_App:assembleAfatRelease :TMessagesProj_App:bundleAfatRelease --stacktrace -PRELEASE_STORE_PASSWORD="$TG_KEYSTORE_PASSWORD" -PRELEASE_KEY_PASSWORD="$TG_KEY_PASSWORD" -PRELEASE_KEY_ALIAS=tg-release
