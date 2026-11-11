@@ -1,0 +1,78 @@
+name: Android Release Build
+
+# Signed release build of the TG fork. Runs only on manual dispatch.
+# Uses the release keystore stored in GitHub Secrets (never committed):
+#   TG_KEYSTORE_BASE64 / TG_KEYSTORE_PASSWORD / TG_KEY_PASSWORD
+# and the Telegram API credentials in TG_API_ID / TG_API_HASH.
+# Produces a signed release APK (package com.tg.messenger) and an AAB
+# for the Play Store. The debug APK workflow is separate (android.yml).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TG_API_ID: ${{ secrets.TG_API_ID }}
+      TG_API_HASH: ${{ secrets.TG_API_HASH }}
+      TG_KEYSTORE_BASE64: ${{ secrets.TG_KEYSTORE_BASE64 }}
+      TG_KEYSTORE_PASSWORD: ${{ secrets.TG_KEYSTORE_PASSWORD }}
+      TG_KEY_PASSWORD: ${{ secrets.TG_KEY_PASSWORD }}
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install SDK packages
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Inject Telegram API credentials
+        run: |
+          if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
+            echo "::error::TG_API_ID / TG_API_HASH secrets are not set on this repo"
+            exit 1
+          fi
+          sed -i "s/public static int APP_ID = .*/public static int APP_ID = $TG_API_ID;/" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          sed -i "s|public static String APP_HASH = .*|public static String APP_HASH = \"$TG_API_HASH\";|" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          grep -q "public static int APP_ID = $TG_API_ID;" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_ID injected"
+          grep -q "APP_HASH" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_HASH line present"
+
+      - name: Restore release keystore
+        run: |
+          if [ -z "$TG_KEYSTORE_BASE64" ] || [ -z "$TG_KEYSTORE_PASSWORD" ] || [ -z "$TG_KEY_PASSWORD" ]; then
+            echo "::error::release keystore secrets are not set on this repo"
+            exit 1
+          fi
+          echo "$TG_KEYSTORE_BASE64" | base64 -d > TMessagesProj/config/release.keystore
+          echo "keystore restored: $(stat -c%s TMessagesProj/config/release.keystore) bytes"
+
+      - name: Build release APK and AAB
+        run: ./gradlew :TMessagesProj_App:assembleAfatRelease :TMessagesProj_App:bundleAfatRelease --stacktrace -PRELEASE_STORE_PASSWORD="$TG_KEYSTORE_PASSWORD" -PRELEASE_KEY_PASSWORD="$TG_KEY_PASSWORD" -PRELEASE_KEY_ALIAS=tg-release
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tg-release-apk
+          path: TMessagesProj_App/build/outputs/apk/afat/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: tg-release-aab
+          path: TMessagesProj_App/build/outputs/bundle/afatRelease/*.aab
+          if-no-files-found: error
