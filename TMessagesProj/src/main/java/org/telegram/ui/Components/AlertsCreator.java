@@ -69,6 +69,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -7712,8 +7713,13 @@ public class AlertsCreator {
             }
         }
 
+        // TG: wrap the account list in a ScrollView so all 100 accounts
+        // stay reachable — a plain LinearLayout would overflow the screen.
+        ScrollView scrollView = new ScrollView(parentActivity);
+        scrollView.addView(linearLayout);
+
         builder.setTitle(LocaleController.getString(R.string.SelectAccount));
-        builder.setView(linearLayout);
+        builder.setView(scrollView);
         builder.setPositiveButton(LocaleController.getString(R.string.Cancel), null);
         return alertDialog[0] = builder.create();
     }
