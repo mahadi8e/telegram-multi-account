@@ -33,6 +33,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Inject Telegram API credentials
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
+            echo "::error::TG_API_ID / TG_API_HASH secrets are not set on this repo"
+            exit 1
+          fi
+          sed -i "s/public static int APP_ID = .*/public static int APP_ID = $TG_API_ID;/" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          sed -i "s|public static String APP_HASH = .*|public static String APP_HASH = \"$TG_API_HASH\";|" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java
+          grep -q "public static int APP_ID = $TG_API_ID;" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_ID injected"
+          grep -q "APP_HASH" TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java && echo "APP_HASH line present"
+
       - name: Build debug APK
         run: ./gradlew :TMessagesProj_App:assembleAfatDebug --stacktrace
 
