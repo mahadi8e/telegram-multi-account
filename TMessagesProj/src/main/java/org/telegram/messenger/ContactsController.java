@@ -111,7 +111,8 @@ public class ContactsController extends BaseController {
 
         private Runnable checkRunnable = () -> {
             for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                if (UserConfig.getInstance(a).isClientActivated()) {
+                // TG fork: only the selected account is active; never resume dormant accounts.
+                if (a == UserConfig.selectedAccount && UserConfig.getInstance(a).isClientActivated()) {
                     ConnectionsManager.getInstance(a).resumeNetworkMaybe();
                     ContactsController.getInstance(a).checkContacts();
                 }

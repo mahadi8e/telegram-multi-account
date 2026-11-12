@@ -214,11 +214,10 @@ public class ApplicationLoader extends Application {
 
                     boolean isSlow = isConnectionSlow();
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                        // TG fork: the account limit is raised to 100, so only touch slots that
-                        // stock Telegram would eagerly init (the first 4) or that hold a logged-in
-                        // account. Creating instances for empty slots here would spawn native
-                        // MTProto instances for accounts that do not exist.
-                        if (a < 4 || UserConfig.getInstance(a).isClientActivated()) {
+                        // TG fork: only the currently selected account is active. Dormant
+                        // accounts get no connection checks; their instances are not created
+                        // until the user switches to them.
+                        if (a == UserConfig.selectedAccount) {
                             ConnectionsManager.getInstance(a).checkConnection();
                             FileLoader.getInstance(a).onNetworkChanged(isSlow);
                         }
@@ -256,11 +255,12 @@ public class ApplicationLoader extends Application {
         SharedPrefsHelper.init(applicationContext);
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
-            // TG fork: skip eager init for empty slots beyond the stock range; their
-            // singletons are created lazily by getInstance() when the account is added.
-            // Eagerly creating all 100 (native MTProto instance + SQLite per slot) on the
-            // main thread at startup killed the process before the first frame.
-            if (a >= 4 && !UserConfig.getInstance(a).isClientActivated()) {
+            // TG fork: only the currently selected account is activated at startup.
+            // Every other account stays dormant (no native MTProto instance, no database,
+            // no connection, no notifications) until the user switches to it; its
+            // singletons are then created lazily by getInstance(). Creating all 100
+            // slots here killed the process on the main thread before the first frame.
+            if (a != UserConfig.selectedAccount) {
                 continue;
             }
             MessagesController.getInstance(a);
@@ -284,8 +284,8 @@ public class ApplicationLoader extends Application {
 
         MediaController.getInstance();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            // TG fork: same guard as the init loop above.
-            if (a < 4 || UserConfig.getInstance(a).isClientActivated()) {
+            // TG fork: same rule as the init loop above: only the selected account.
+            if (a == UserConfig.selectedAccount) {
                 ContactsController.getInstance(a).checkAppAccount();
                 DownloadController.getInstance(a);
             }

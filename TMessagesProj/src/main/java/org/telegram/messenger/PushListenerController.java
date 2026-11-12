@@ -221,6 +221,17 @@ public class PushListenerController {
                         countDownLatch.countDown();
                         return;
                     }
+                    // TG fork: pushes for any account other than the currently selected one
+                    // are dropped here. Dormant accounts must not wake, connect or show
+                    // notifications until the user switches to them; on switch, the account
+                    // connects and syncs everything it missed.
+                    if (account != UserConfig.selectedAccount) {
+                        if (BuildVars.LOGS_ENABLED) {
+                            FileLog.d(tag + " ACCOUNT NOT SELECTED, PUSH DROPPED");
+                        }
+                        countDownLatch.countDown();
+                        return;
+                    }
                     if (BuildVars.LOGS_ENABLED) {
                         FileLog.d(tag + " " + loc_key);
                     }
