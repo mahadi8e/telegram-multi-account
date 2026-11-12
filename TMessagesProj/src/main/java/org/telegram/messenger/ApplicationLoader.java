@@ -214,8 +214,14 @@ public class ApplicationLoader extends Application {
 
                     boolean isSlow = isConnectionSlow();
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                        ConnectionsManager.getInstance(a).checkConnection();
-                        FileLoader.getInstance(a).onNetworkChanged(isSlow);
+                        // TG fork: the account limit is raised to 100, so only touch slots that
+                        // stock Telegram would eagerly init (the first 4) or that hold a logged-in
+                        // account. Creating instances for empty slots here would spawn native
+                        // MTProto instances for accounts that do not exist.
+                        if (a < 4 || UserConfig.getInstance(a).isClientActivated()) {
+                            ConnectionsManager.getInstance(a).checkConnection();
+                            FileLoader.getInstance(a).onNetworkChanged(isSlow);
+                        }
                     }
                 }
             };
@@ -250,6 +256,13 @@ public class ApplicationLoader extends Application {
         SharedPrefsHelper.init(applicationContext);
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
+            // TG fork: skip eager init for empty slots beyond the stock range; their
+            // singletons are created lazily by getInstance() when the account is added.
+            // Eagerly creating all 100 (native MTProto instance + SQLite per slot) on the
+            // main thread at startup killed the process before the first frame.
+            if (a >= 4 && !UserConfig.getInstance(a).isClientActivated()) {
+                continue;
+            }
             MessagesController.getInstance(a);
             if (a == 0) {
                 SharedConfig.pushStringStatus = "__FIREBASE_GENERATING_SINCE_" + ConnectionsManager.getInstance(a).getCurrentTime() + "__";
@@ -271,8 +284,11 @@ public class ApplicationLoader extends Application {
 
         MediaController.getInstance();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            ContactsController.getInstance(a).checkAppAccount();
-            DownloadController.getInstance(a);
+            // TG fork: same guard as the init loop above.
+            if (a < 4 || UserConfig.getInstance(a).isClientActivated()) {
+                ContactsController.getInstance(a).checkAppAccount();
+                DownloadController.getInstance(a);
+            }
         }
         BillingController.getInstance().startConnection();
     }
