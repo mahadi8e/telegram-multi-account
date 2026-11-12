@@ -224,8 +224,8 @@ public class PushListenerController {
                         countDownLatch.countDown();
                         return;
                     }
-                    // TG fork: pushes for dormant accounts (not selected and not
-                    // "always active") are dropped here. Dormant accounts must not wake,
+                    // TG fork: pushes for dormant accounts (any account other than the
+                    // selected one) are dropped here. Dormant accounts must not wake,
                     // connect or show notifications until the user switches to them; on
                     // switch, the account connects and syncs everything it missed.
                     // The account stays registered on the server (no unregister); the

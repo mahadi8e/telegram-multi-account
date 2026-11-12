@@ -214,8 +214,8 @@ public class ApplicationLoader extends Application {
 
                     boolean isSlow = isConnectionSlow();
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                        // TG fork: only live accounts (selected or always-active) are active.
-                        // Dormant accounts get no connection checks; their instances are not
+                        // TG fork: only the selected account is active. Dormant
+                        // accounts get no connection checks; their instances are not
                         // created until the user switches to them.
                         if (UserConfig.isLiveAccount(a)) {
                             ConnectionsManager.getInstance(a).checkConnection();
@@ -255,8 +255,8 @@ public class ApplicationLoader extends Application {
         SharedPrefsHelper.init(applicationContext);
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
-            // TG fork: only live accounts (the selected one, plus any marked
-            // "always active") are activated at startup. Every other account stays
+            // TG fork: only the selected account is activated at startup.
+            // Every other account stays
             // dormant (no native MTProto instance, no database, no connection, no
             // notifications) until the user switches to it; its singletons are then
             // created lazily by getInstance(). Creating all 100 slots here killed
