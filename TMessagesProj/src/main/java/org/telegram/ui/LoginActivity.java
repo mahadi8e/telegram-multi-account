@@ -553,6 +553,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public boolean onFragmentCreate() {
+        // TG fork: an Add Account login (newAccount) targets a dormant slot whose
+        // controllers were never created at startup. Fully initialize the slot
+        // before any login UI is built, so no login code path touches a cold slot.
+        if (newAccount) {
+            ApplicationLoader.activateAccountForLogin(currentAccount);
+        }
         getNotificationCenter().addWeakObserver(this, NotificationCenter.didUpdateConnectionState);
         getNotificationCenter().addWeakObserver(this, NotificationCenter.newSuggestionsAvailable);
         return super.onFragmentCreate();

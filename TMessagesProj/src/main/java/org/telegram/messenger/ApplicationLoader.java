@@ -188,6 +188,23 @@ public class ApplicationLoader extends Application {
         return null;
     }
 
+    // TG fork: fully initialize a dormant slot before it is used for an Add Account
+    // login. In stock Telegram every slot's controllers (and native MTProto instance)
+    // are created at app startup; with the single-active-account design they are not,
+    // and the login UI must never be the first thing to touch a cold slot — doing so
+    // froze and killed the process. The currently active account is left completely
+    // untouched here; it is paused by the stock switch flow only after login succeeds,
+    // and LoginActivity's own onPause/onResume manages the login slot's pause state,
+    // so a cancelled login leaves the slot paused and dormant again.
+    public static void activateAccountForLogin(int account) {
+        UserConfig.getInstance(account).loadConfig();
+        MessagesController.getInstance(account);
+        ConnectionsManager.getInstance(account);
+        ContactsController.getInstance(account);
+        DownloadController.getInstance(account);
+        ImageLoader.getInstance().attachFileLoaderDelegate(account);
+    }
+
     public static void postInitApplication() {
         if (applicationInited || applicationContext == null) {
             return;
@@ -219,6 +236,9 @@ public class ApplicationLoader extends Application {
                         // created until the user switches to them.
                         if (UserConfig.isLiveAccount(a)) {
                             ConnectionsManager.getInstance(a).checkConnection();
+                            // TG fork: also nudge a resume, so the active account does
+                            // not sit on "Connecting..." after a network change.
+                            ConnectionsManager.getInstance(a).resumeNetworkMaybe();
                             FileLoader.getInstance(a).onNetworkChanged(isSlow);
                         }
                     }
