@@ -230,7 +230,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @SuppressLint("HardwareIds")
 public class LoginActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
-    public final static boolean ENABLE_PASTED_TEXT_PROCESSING = false;
+    // TG fork: enable pasted-number processing on the phone screens (stock public
+    // source ships it disabled). Applied locally 2026-11-12 at the user's request;
+    // ships with the NEXT build — no build was started for this change alone.
+    public final static boolean ENABLE_PASTED_TEXT_PROCESSING = true;
     private final static int SHOW_DELAY = SharedConfig.getDevicePerformanceClass() <= SharedConfig.PERFORMANCE_CLASS_AVERAGE ? 150 : 100;
 
     public static final boolean TEST_BACKEND_IN_STORE = false;
