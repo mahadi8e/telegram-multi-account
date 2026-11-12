@@ -134,7 +134,8 @@ public class LogoutActivity extends BaseFragment {
             if (position == addAccountRow) {
                 int freeAccounts = 0;
                 Integer availableAccount = null;
-                for (int a = UserConfig.MAX_ACCOUNT_COUNT - 1; a >= 0; a--) {
+                // TG fork: pick the LOWEST free slot (stock searched from the top down).
+                for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
                     if (!UserConfig.getInstance(a).isClientActivated()) {
                         freeAccounts++;
                         if (availableAccount == null) {

@@ -1219,6 +1219,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         switchingAccount = true;
 
         ConnectionsManager.getInstance(currentAccount).setAppPaused(true, false);
+        if (BuildVars.LOGS_ENABLED) {
+            Log.d("TGSLOT", "switch " + currentAccount + " -> " + account);
+        }
         UserConfig.selectedAccount = account;
         UserConfig.getInstance(0).saveConfig(false);
 

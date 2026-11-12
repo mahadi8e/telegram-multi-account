@@ -17,6 +17,7 @@
 #include <openssl/rand.h>
 #include <zlib.h>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <cinttypes>
 #include "ConnectionsManager.h"
@@ -138,6 +139,11 @@ ConnectionsManager::~ConnectionsManager() {
 }
 
 ConnectionsManager& ConnectionsManager::getInstance(int32_t instanceNum) {
+    // TG fork: the Java account limit was raised to MAX_ACCOUNT_COUNT (100).
+    // Out-of-range values (never passed by the Java side) fall back to instance 0.
+    if (instanceNum < 0 || instanceNum >= MAX_ACCOUNT_COUNT) {
+        instanceNum = 0;
+    }
     switch (instanceNum) {
         case 0:
             static ConnectionsManager instance0(0);
@@ -152,10 +158,21 @@ ConnectionsManager& ConnectionsManager::getInstance(int32_t instanceNum) {
             static ConnectionsManager instance3(3);
             return instance3;
         case 4:
-        default:
             static ConnectionsManager instance4(4);
             return instance4;
+        default:
+            break;
     }
+    // TG fork: slots >= 5 get real instances of their own, created lazily.
+    // The stock switch silently mapped every slot >= 5 onto instance4, so all
+    // accounts past the fifth shared one native connection/auth state.
+    static ConnectionsManager *extraInstances[MAX_ACCOUNT_COUNT] = {nullptr};
+    static std::mutex extraInstancesMutex;
+    std::lock_guard<std::mutex> lock(extraInstancesMutex);
+    if (extraInstances[instanceNum] == nullptr) {
+        extraInstances[instanceNum] = new ConnectionsManager(instanceNum);
+    }
+    return *extraInstances[instanceNum];
 }
 
 int ConnectionsManager::callEvents(int64_t now) {

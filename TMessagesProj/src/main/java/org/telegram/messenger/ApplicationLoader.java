@@ -197,6 +197,9 @@ public class ApplicationLoader extends Application {
     // and LoginActivity's own onPause/onResume manages the login slot's pause state,
     // so a cancelled login leaves the slot paused and dormant again.
     public static void activateAccountForLogin(int account) {
+        if (BuildVars.LOGS_ENABLED) {
+            android.util.Log.d("TGSLOT", "activate-for-login slot=" + account);
+        }
         UserConfig.getInstance(account).loadConfig();
         MessagesController.getInstance(account);
         ConnectionsManager.getInstance(account);

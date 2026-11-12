@@ -273,6 +273,9 @@ public class ConnectionsManager extends BaseController {
             userPremium = getUserConfig().getCurrentUser().premium;
         }
         init(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, langCode, systemLangCode, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+        if (BuildVars.LOGS_ENABLED) {
+            android.util.Log.d("TGSLOT", "init slot=" + instance);
+        }
     }
 
     private String getRegId() {
@@ -811,6 +814,9 @@ public class ConnectionsManager extends BaseController {
             if (lastPauseTime == 0) {
                 lastPauseTime = System.currentTimeMillis();
             }
+            if (BuildVars.LOGS_ENABLED) {
+                android.util.Log.d("TGSLOT", "deactivate slot=" + currentAccount);
+            }
             native_pauseNetwork(currentAccount);
         } else {
             if (appPaused) {
@@ -823,6 +829,9 @@ public class ConnectionsManager extends BaseController {
                 getContactsController().checkContacts();
             }
             lastPauseTime = 0;
+            if (BuildVars.LOGS_ENABLED) {
+                android.util.Log.d("TGSLOT", "activate slot=" + currentAccount);
+            }
             native_resumeNetwork(currentAccount, false);
         }
     }
