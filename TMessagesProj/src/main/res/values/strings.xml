@@ -2718,6 +2718,7 @@
     <string name="TapToChangePhone">Tap to change phone number</string>
     <string name="ShowNotificationsFor">Show notifications for</string>
     <string name="AllAccounts">All Accounts</string>
+    <string name="AlwaysActive">Always active</string>
     <string name="ShowNotificationsForInfo">Turn this off if you want to receive notifications only from your active account.</string>
     <string name="NotificationsForChats">Notifications for chats</string>
     <string name="NotificationsPrivateChats">Private Chats</string>

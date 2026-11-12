@@ -59,7 +59,8 @@ public class ImportingService extends Service implements NotificationCenter.Noti
 
     private boolean hasImportingHistory() {
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (SendMessagesHelper.getInstance(a).isImportingHistory()) {
+            // TG fork: an import can only be running for a logged-in account.
+            if (UserConfig.getInstance(a).isClientActivated() && SendMessagesHelper.getInstance(a).isImportingHistory()) {
                 return true;
             }
         }
@@ -68,7 +69,8 @@ public class ImportingService extends Service implements NotificationCenter.Noti
 
     private boolean hasImportingStickers() {
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (SendMessagesHelper.getInstance(a).isImportingStickers()) {
+            // TG fork: an import can only be running for a logged-in account.
+            if (UserConfig.getInstance(a).isClientActivated() && SendMessagesHelper.getInstance(a).isImportingStickers()) {
                 return true;
             }
         }

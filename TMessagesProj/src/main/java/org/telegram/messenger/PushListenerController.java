@@ -63,7 +63,10 @@ public class PushListenerController {
                 UserConfig userConfig = UserConfig.getInstance(a);
                 userConfig.registeredForPush = false;
                 userConfig.saveConfig(false);
-                if (userConfig.getClientUserId() != 0) {
+                // TG fork: only live accounts (re)register and connect on a token
+                // refresh; dormant accounts keep their server-side registration via
+                // the active account's other_uids and register themselves on switch.
+                if (userConfig.getClientUserId() != 0 && UserConfig.isLiveAccount(a)) {
                     final int currentAccount = a;
                     if (sendStat) {
                         String tag = pushType == PUSH_TYPE_FIREBASE ? "fcm" : "hcm";
@@ -221,11 +224,13 @@ public class PushListenerController {
                         countDownLatch.countDown();
                         return;
                     }
-                    // TG fork: pushes for any account other than the currently selected one
-                    // are dropped here. Dormant accounts must not wake, connect or show
-                    // notifications until the user switches to them; on switch, the account
-                    // connects and syncs everything it missed.
-                    if (account != UserConfig.selectedAccount) {
+                    // TG fork: pushes for dormant accounts (not selected and not
+                    // "always active") are dropped here. Dormant accounts must not wake,
+                    // connect or show notifications until the user switches to them; on
+                    // switch, the account connects and syncs everything it missed.
+                    // The account stays registered on the server (no unregister); the
+                    // drop is purely local.
+                    if (!UserConfig.isLiveAccount(account)) {
                         if (BuildVars.LOGS_ENABLED) {
                             FileLog.d(tag + " ACCOUNT NOT SELECTED, PUSH DROPPED");
                         }
@@ -1776,7 +1781,8 @@ public class PushListenerController {
 
     private static void onDecryptError() {
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (UserConfig.getInstance(a).isClientActivated()) {
+            // TG fork: never wake dormant accounts, not even on a decrypt error.
+            if (UserConfig.isLiveAccount(a) && UserConfig.getInstance(a).isClientActivated()) {
                 ConnectionsManager.onInternalPushReceived(a);
                 ConnectionsManager.getInstance(a).resumeNetworkMaybe();
             }

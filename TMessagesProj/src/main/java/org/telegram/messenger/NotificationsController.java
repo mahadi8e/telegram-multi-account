@@ -1087,6 +1087,22 @@ public class NotificationsController extends BaseController implements Notificat
             FileLog.d("NotificationsController: processNewMessages msgs.size()=" + (messageObjects == null ? "null" : messageObjects.size()) + " isLast=" + isLast + " isFcm=" + isFcm + ")");
         }
 
+        // TG fork: when this account was dormant and has just been switched to, the
+        // messages it missed are a backlog sync, not new arrivals. They are fetched
+        // and shown in the chat list, but they must not flood the user with one
+        // notification per missed message, so drop pre-switch messages here.
+        if (messageObjects != null) {
+            int backlogCutoff = getUserConfig().tgBacklogCutoff;
+            if (backlogCutoff != 0) {
+                for (int i = messageObjects.size() - 1; i >= 0; i--) {
+                    MessageObject backlogObject = messageObjects.get(i);
+                    if (backlogObject != null && backlogObject.messageOwner != null && backlogObject.messageOwner.date != 0 && backlogObject.messageOwner.date < backlogCutoff) {
+                        messageObjects.remove(i);
+                    }
+                }
+            }
+        }
+
         if (messageObjects != null) {
             for (int i = 0; i < messageObjects.size(); ++i) {
                 final MessageObject messageObject = messageObjects.get(i);
@@ -1788,6 +1804,10 @@ public class NotificationsController extends BaseController implements Notificat
         int count = 0;
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
             if (!UserConfig.getInstance(a).isClientActivated()) {
+                continue;
+            }
+            // TG fork: dormant accounts never contribute to the badge count.
+            if (!UserConfig.isLiveAccount(a)) {
                 continue;
             }
             if (!SharedConfig.showNotificationsForAllAccounts && UserConfig.selectedAccount != a) {

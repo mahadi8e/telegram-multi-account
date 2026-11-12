@@ -591,7 +591,10 @@ public class VoIPPreNotificationService { // } extends Service implements AudioM
         stopRinging();
         if (!answered) {
             for (int i = 0; i < UserConfig.MAX_ACCOUNT_COUNT; ++i) {
-                MessagesController.getInstance(i).ignoreSetOnline = false;
+                // TG fork: only live accounts can have had call activity this session.
+                if (UserConfig.isLiveAccount(i)) {
+                    MessagesController.getInstance(i).ignoreSetOnline = false;
+                }
             }
             AndroidUtilities.runOnUIThread(() -> {
                 final LaunchActivity activity = LaunchActivity.instance;

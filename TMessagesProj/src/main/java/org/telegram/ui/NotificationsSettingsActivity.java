@@ -101,6 +101,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
     private int accountsSectionRow;
     @Keep
     private int accountsAllRow;
+    private int accountsAlwaysActiveRow;
     private int accountsInfoRow;
 
     private int notificationsServiceRow;
@@ -171,10 +172,12 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
         if (UserConfig.getActivatedAccountsCount() > 1) {
             accountsSectionRow = rowCount++;
             accountsAllRow = rowCount++;
+            accountsAlwaysActiveRow = rowCount++;
             accountsInfoRow = rowCount++;
         } else {
             accountsSectionRow = -1;
             accountsAllRow = -1;
+            accountsAlwaysActiveRow = -1;
             accountsInfoRow = -1;
         }
 
@@ -750,6 +753,10 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                 editor.commit();
                 SharedConfig.showNotificationsForAllAccounts = !enabled;
                 for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                    // TG fork: dormant accounts have no notifications to show or hide.
+                    if (!UserConfig.isLiveAccount(a)) {
+                        continue;
+                    }
                     if (SharedConfig.showNotificationsForAllAccounts) {
                         NotificationsController.getInstance(a).showNotifications();
                     } else {
@@ -760,6 +767,13 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                         }
                     }
                 }
+            } else if (position == accountsAlwaysActiveRow) {
+                // TG fork: per-account "always active" toggle. When on, this account
+                // stays live (connected, notifying) even while another account is
+                // selected. Default off: only the selected account is live.
+                enabled = UserConfig.getInstance(currentAccount).tgAlwaysActive;
+                UserConfig.getInstance(currentAccount).tgAlwaysActive = !enabled;
+                UserConfig.getInstance(currentAccount).saveConfig(false);
             } else if (position == notificationsServiceRow) {
                 SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
                 enabled = preferences.getBoolean("pushService", getMessagesController().keepAliveService);
@@ -1044,6 +1058,8 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                         checkCell.setTextAndCheck(getString("Vibrate", R.string.Vibrate), preferences.getBoolean("EnableCallVibrate", true), true);
                     } else if (position == accountsAllRow) {
                         checkCell.setTextAndCheck(getString("AllAccounts", R.string.AllAccounts), MessagesController.getGlobalNotificationsSettings().getBoolean("AllAccounts", true), false);
+                    } else if (position == accountsAlwaysActiveRow) {
+                        checkCell.setTextAndCheck(getString("AlwaysActive", R.string.AlwaysActive), UserConfig.getInstance(currentAccount).tgAlwaysActive, false);
                     }
                     break;
                 }
@@ -1214,7 +1230,7 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                     position == inappPreviewRow || position == contactJoinedRow || position == pinnedMessageRow ||
                     position == notificationsServiceRow || position == badgeNumberMutedRow || position == badgeNumberMessagesRow ||
                     position == badgeNumberShowRow || position == inappPriorityRow || position == inchatSoundRow ||
-                    position == androidAutoAlertRow || position == accountsAllRow) {
+                    position == androidAutoAlertRow || position == accountsAllRow || position == accountsAlwaysActiveRow) {
                 return 1;
             } else if (position == resetNotificationsRow) {
                 return 2;

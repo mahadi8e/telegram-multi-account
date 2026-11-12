@@ -214,10 +214,10 @@ public class ApplicationLoader extends Application {
 
                     boolean isSlow = isConnectionSlow();
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                        // TG fork: only the currently selected account is active. Dormant
-                        // accounts get no connection checks; their instances are not created
-                        // until the user switches to them.
-                        if (a == UserConfig.selectedAccount) {
+                        // TG fork: only live accounts (selected or always-active) are active.
+                        // Dormant accounts get no connection checks; their instances are not
+                        // created until the user switches to them.
+                        if (UserConfig.isLiveAccount(a)) {
                             ConnectionsManager.getInstance(a).checkConnection();
                             FileLoader.getInstance(a).onNetworkChanged(isSlow);
                         }
@@ -255,12 +255,13 @@ public class ApplicationLoader extends Application {
         SharedPrefsHelper.init(applicationContext);
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
-            // TG fork: only the currently selected account is activated at startup.
-            // Every other account stays dormant (no native MTProto instance, no database,
-            // no connection, no notifications) until the user switches to it; its
-            // singletons are then created lazily by getInstance(). Creating all 100
-            // slots here killed the process on the main thread before the first frame.
-            if (a != UserConfig.selectedAccount) {
+            // TG fork: only live accounts (the selected one, plus any marked
+            // "always active") are activated at startup. Every other account stays
+            // dormant (no native MTProto instance, no database, no connection, no
+            // notifications) until the user switches to it; its singletons are then
+            // created lazily by getInstance(). Creating all 100 slots here killed
+            // the process on the main thread before the first frame.
+            if (!UserConfig.isLiveAccount(a)) {
                 continue;
             }
             MessagesController.getInstance(a);
@@ -284,8 +285,8 @@ public class ApplicationLoader extends Application {
 
         MediaController.getInstance();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            // TG fork: same rule as the init loop above: only the selected account.
-            if (a == UserConfig.selectedAccount) {
+            // TG fork: same rule as the init loop above: only live accounts.
+            if (UserConfig.isLiveAccount(a)) {
                 ContactsController.getInstance(a).checkAppAccount();
                 DownloadController.getInstance(a);
             }

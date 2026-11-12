@@ -17,7 +17,10 @@ public class StopLiveLocationReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            LocationController.getInstance(a).removeAllLocationSharings();
+            // TG fork: only logged-in accounts can have sharings to remove.
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                LocationController.getInstance(a).removeAllLocationSharings();
+            }
         }
     }
 }

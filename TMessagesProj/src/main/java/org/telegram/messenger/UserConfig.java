@@ -33,6 +33,10 @@ public class UserConfig extends BaseController {
     private TLRPC.User currentUser;
     public boolean registeredForPush;
     public int lastSendMessageId = -210000;
+    // TG fork: per-account "always active" toggle (stay live even when not selected)
+    // and the backlog cutoff used to suppress notification floods after a switch.
+    public boolean tgAlwaysActive;
+    public int tgBacklogCutoff;
     public int lastBroadcastId = -1;
     public int contactsSavedCount;
     public long clientUserId;
@@ -99,6 +103,12 @@ public class UserConfig extends BaseController {
         return localInstance;
     }
 
+    // TG fork: an account is "live" — allowed to init, connect and notify — when it is
+    // the currently selected account or the user marked it "always active".
+    public static boolean isLiveAccount(int account) {
+        return account == selectedAccount || getInstance(account).tgAlwaysActive;
+    }
+
     public static int getActivatedAccountsCount() {
         int count = 0;
         for (int a = 0; a < MAX_ACCOUNT_COUNT; a++) {
@@ -147,6 +157,8 @@ public class UserConfig extends BaseController {
                         editor.putInt("selectedAccount", selectedAccount);
                     }
                     editor.putBoolean("registeredForPush", registeredForPush);
+                    editor.putBoolean("tgAlwaysActive", tgAlwaysActive);
+                    editor.putInt("tgBacklogCutoff", tgBacklogCutoff);
                     editor.putInt("lastSendMessageId", lastSendMessageId);
                     editor.putInt("contactsSavedCount", contactsSavedCount);
                     editor.putInt("lastBroadcastId", lastBroadcastId);
@@ -299,6 +311,8 @@ public class UserConfig extends BaseController {
                 selectedAccount = preferences.getInt("selectedAccount", 0);
             }
             registeredForPush = preferences.getBoolean("registeredForPush", false);
+            tgAlwaysActive = preferences.getBoolean("tgAlwaysActive", false);
+            tgBacklogCutoff = preferences.getInt("tgBacklogCutoff", 0);
             lastSendMessageId = preferences.getInt("lastSendMessageId", -210000);
             contactsSavedCount = preferences.getInt("contactsSavedCount", 0);
             lastBroadcastId = preferences.getInt("lastBroadcastId", -1);

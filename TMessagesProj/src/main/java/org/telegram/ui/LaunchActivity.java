@@ -115,6 +115,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.ContactsLoadingObserver;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.FingerprintController;
 import org.telegram.messenger.FlagSecureReason;
@@ -1220,6 +1221,15 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         ConnectionsManager.getInstance(currentAccount).setAppPaused(true, false);
         UserConfig.selectedAccount = account;
         UserConfig.getInstance(0).saveConfig(false);
+
+        // TG fork: the newly selected account becomes live. Attach its FileLoader
+        // delegate (skipped at startup while it was dormant) and mark everything
+        // from before this moment as backlog, so its missed messages sync silently
+        // instead of flooding notifications. Its controllers and connection are
+        // created lazily by the stock flow from here on.
+        ImageLoader.getInstance().attachFileLoaderDelegate(account);
+        UserConfig.getInstance(account).tgBacklogCutoff = ConnectionsManager.getInstance(account).getCurrentTime();
+        UserConfig.getInstance(account).saveConfig(false);
 
         checkCurrentAccount();
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.activeAccountChanged, account);

@@ -1765,7 +1765,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         audioInfo = null;
         playMusicAgain = false;
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            DownloadController.getInstance(a).cleanup();
+            // TG fork: only logged-in accounts can have a DownloadController worth cleaning.
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                DownloadController.getInstance(a).cleanup();
+            }
         }
         videoConvertQueue.clear();
         generatingWaveform.clear();

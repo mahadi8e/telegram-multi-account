@@ -971,6 +971,10 @@ public class LocationController extends BaseController implements NotificationCe
     public static int getLocationsCount() {
         int count = 0;
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            // TG fork: unactivated slots have no sharings; don't create their controllers.
+            if (!UserConfig.getInstance(a).isClientActivated()) {
+                continue;
+            }
             count += LocationController.getInstance(a).sharingLocationsUI.size();
         }
         return count;

@@ -2081,117 +2081,10 @@ public class ImageLoader {
         return localInstance;
     }
 
-    public ImageLoader() {
-        thumbGeneratingQueue.setPriority(Thread.MIN_PRIORITY);
 
-        int memoryClass = ((ActivityManager) ApplicationLoader.applicationContext.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryClass();
-        int maxSize;
-        if (canForce8888 = memoryClass >= 192) {
-            maxSize = 30;
-        } else {
-            maxSize = 15;
-        }
-        int cacheSize = DEBUG_MODE ? 1 : Math.min(maxSize, memoryClass / 7) * 1024 * 1024;
-
-        int commonCacheSize =  DEBUG_MODE ? 1 : (int) (cacheSize * 0.8f);
-        int smallImagesCacheSize =   DEBUG_MODE ? 1 : (int) (cacheSize * 0.2f);
-
-        memCache = new LruCache<BitmapDrawable>(commonCacheSize) {
-            @Override
-            protected int sizeOf(String key, BitmapDrawable value) {
-                return sizeOfBitmapDrawable(value);
-            }
-
-            @Override
-            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
-                if (ignoreRemoval != null && ignoreRemoval.equals(key)) {
-                    return;
-                }
-                final Integer count = bitmapUseCounts.get(key);
-                if (count == null || count == 0) {
-                    Bitmap b = oldValue.getBitmap();
-                    if (!b.isRecycled()) {
-                        ArrayList<Bitmap> bitmapToRecycle = new ArrayList<>();
-                        bitmapToRecycle.add(b);
-                        AndroidUtilities.recycleBitmaps(bitmapToRecycle);
-                    }
-                }
-            }
-        };
-        smallImagesMemCache = new LruCache<BitmapDrawable>(smallImagesCacheSize) {
-            @Override
-            protected int sizeOf(String key, BitmapDrawable value) {
-                return sizeOfBitmapDrawable(value);
-            }
-
-            @Override
-            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
-                if (ignoreRemoval != null && ignoreRemoval.equals(key)) {
-                    return;
-                }
-                final Integer count = bitmapUseCounts.get(key);
-                if (count == null || count == 0) {
-                    Bitmap b = oldValue.getBitmap();
-                    if (!b.isRecycled()) {
-                        ArrayList<Bitmap> bitmapToRecycle = new ArrayList<>();
-                        bitmapToRecycle.add(b);
-                        AndroidUtilities.recycleBitmaps(bitmapToRecycle);
-                    }
-                }
-            }
-        };
-        wallpaperMemCache = new LruCache<BitmapDrawable>(DEBUG_MODE ? 1 : cacheSize / 4) {
-            @Override
-            protected int sizeOf(String key, BitmapDrawable value) {
-                return sizeOfBitmapDrawable(value);
-            }
-        };
-
-        lottieMemCache = new LruCache<BitmapDrawable>(DEBUG_MODE ? 1 : 512 * 512 * 2 * 4 * 5) {
-
-            @Override
-            protected int sizeOf(String key, BitmapDrawable value) {
-                return sizeOfBitmapDrawable(value);
-            }
-
-            @Override
-            public BitmapDrawable put(String key, BitmapDrawable value) {
-                if (value instanceof AnimatedFileDrawable) {
-                    cachedAnimatedFileDrawables.add((AnimatedFileDrawable) value);
-                }
-                return super.put(key, value);
-            }
-
-            @Override
-            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
-                final Integer count = bitmapUseCounts.get(key);
-                if (oldValue instanceof AnimatedFileDrawable) {
-                    cachedAnimatedFileDrawables.remove((AnimatedFileDrawable) oldValue);
-                }
-                if (count == null || count == 0) {
-                    if (oldValue instanceof AnimatedFileDrawable) {
-                        ((AnimatedFileDrawable) oldValue).recycle();
-                    }
-                    if (oldValue instanceof RLottieDrawable) {
-                        ((RLottieDrawable) oldValue).recycle(false);
-                    }
-                }
-            }
-        };
-
-        SparseArray<File> mediaDirs = new SparseArray<>();
-        File cachePath = AndroidUtilities.getCacheDir();
-        if (!cachePath.isDirectory()) {
-            try {
-                cachePath.mkdirs();
-            } catch (Exception e) {
-                FileLog.e(e);
-            }
-        }
-        AndroidUtilities.createEmptyFile(new File(cachePath, ".nomedia"));
-        mediaDirs.put(FileLoader.MEDIA_DIR_CACHE, cachePath);
-
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+    // TG fork: extracted from the constructor loop above, so a dormant account's
+    // FileLoader delegate can also be attached later, when it is switched to.
+    public void attachFileLoaderDelegate(int a) {
             final int currentAccount = a;
             FileLoader.getInstance(a).setDelegate(new FileLoader.FileLoaderDelegate() {
                 @Override
@@ -2322,6 +2215,124 @@ public class ImageLoader {
                     }
                 }
             });
+    }
+    public ImageLoader() {
+        thumbGeneratingQueue.setPriority(Thread.MIN_PRIORITY);
+
+        int memoryClass = ((ActivityManager) ApplicationLoader.applicationContext.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryClass();
+        int maxSize;
+        if (canForce8888 = memoryClass >= 192) {
+            maxSize = 30;
+        } else {
+            maxSize = 15;
+        }
+        int cacheSize = DEBUG_MODE ? 1 : Math.min(maxSize, memoryClass / 7) * 1024 * 1024;
+
+        int commonCacheSize =  DEBUG_MODE ? 1 : (int) (cacheSize * 0.8f);
+        int smallImagesCacheSize =   DEBUG_MODE ? 1 : (int) (cacheSize * 0.2f);
+
+        memCache = new LruCache<BitmapDrawable>(commonCacheSize) {
+            @Override
+            protected int sizeOf(String key, BitmapDrawable value) {
+                return sizeOfBitmapDrawable(value);
+            }
+
+            @Override
+            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
+                if (ignoreRemoval != null && ignoreRemoval.equals(key)) {
+                    return;
+                }
+                final Integer count = bitmapUseCounts.get(key);
+                if (count == null || count == 0) {
+                    Bitmap b = oldValue.getBitmap();
+                    if (!b.isRecycled()) {
+                        ArrayList<Bitmap> bitmapToRecycle = new ArrayList<>();
+                        bitmapToRecycle.add(b);
+                        AndroidUtilities.recycleBitmaps(bitmapToRecycle);
+                    }
+                }
+            }
+        };
+        smallImagesMemCache = new LruCache<BitmapDrawable>(smallImagesCacheSize) {
+            @Override
+            protected int sizeOf(String key, BitmapDrawable value) {
+                return sizeOfBitmapDrawable(value);
+            }
+
+            @Override
+            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
+                if (ignoreRemoval != null && ignoreRemoval.equals(key)) {
+                    return;
+                }
+                final Integer count = bitmapUseCounts.get(key);
+                if (count == null || count == 0) {
+                    Bitmap b = oldValue.getBitmap();
+                    if (!b.isRecycled()) {
+                        ArrayList<Bitmap> bitmapToRecycle = new ArrayList<>();
+                        bitmapToRecycle.add(b);
+                        AndroidUtilities.recycleBitmaps(bitmapToRecycle);
+                    }
+                }
+            }
+        };
+        wallpaperMemCache = new LruCache<BitmapDrawable>(DEBUG_MODE ? 1 : cacheSize / 4) {
+            @Override
+            protected int sizeOf(String key, BitmapDrawable value) {
+                return sizeOfBitmapDrawable(value);
+            }
+        };
+
+        lottieMemCache = new LruCache<BitmapDrawable>(DEBUG_MODE ? 1 : 512 * 512 * 2 * 4 * 5) {
+
+            @Override
+            protected int sizeOf(String key, BitmapDrawable value) {
+                return sizeOfBitmapDrawable(value);
+            }
+
+            @Override
+            public BitmapDrawable put(String key, BitmapDrawable value) {
+                if (value instanceof AnimatedFileDrawable) {
+                    cachedAnimatedFileDrawables.add((AnimatedFileDrawable) value);
+                }
+                return super.put(key, value);
+            }
+
+            @Override
+            protected void entryRemoved(boolean evicted, String key, final BitmapDrawable oldValue, BitmapDrawable newValue) {
+                final Integer count = bitmapUseCounts.get(key);
+                if (oldValue instanceof AnimatedFileDrawable) {
+                    cachedAnimatedFileDrawables.remove((AnimatedFileDrawable) oldValue);
+                }
+                if (count == null || count == 0) {
+                    if (oldValue instanceof AnimatedFileDrawable) {
+                        ((AnimatedFileDrawable) oldValue).recycle();
+                    }
+                    if (oldValue instanceof RLottieDrawable) {
+                        ((RLottieDrawable) oldValue).recycle(false);
+                    }
+                }
+            }
+        };
+
+        SparseArray<File> mediaDirs = new SparseArray<>();
+        File cachePath = AndroidUtilities.getCacheDir();
+        if (!cachePath.isDirectory()) {
+            try {
+                cachePath.mkdirs();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        AndroidUtilities.createEmptyFile(new File(cachePath, ".nomedia"));
+        mediaDirs.put(FileLoader.MEDIA_DIR_CACHE, cachePath);
+
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            // TG fork: only live accounts get a FileLoader here (each one owns a
+            // thread). A dormant account's delegate is attached when the user
+            // switches to it (see LaunchActivity.switchToAccount).
+            if (UserConfig.isLiveAccount(a)) {
+                attachFileLoaderDelegate(a);
+            }
         }
         FileLoader.setMediaDirs(mediaDirs);
 
