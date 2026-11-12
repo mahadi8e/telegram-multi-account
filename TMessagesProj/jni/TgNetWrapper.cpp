@@ -461,6 +461,11 @@ void setSystemLangCode(JNIEnv *env, jclass c, jint instanceNum, jstring langCode
     }
 }
 
+// TG fork: instances 0..4 exist from the start and get their delegate in
+// setJava below. Instances >= 5 are created lazily (see
+// ConnectionsManager::getInstance) and get their delegate in init().
+static bool tgDelegateReady[MAX_ACCOUNT_COUNT] = {false};
+
 void init(JNIEnv *env, jclass c, jint instanceNum, jint version, jint layer, jint apiId, jstring deviceModel, jstring systemVersion, jstring appVersion, jstring langCode, jstring systemLangCode, jstring configPath, jstring logPath, jstring regId, jstring cFingerprint, jstring installerId, jstring packageId, jint timezoneOffset, jlong userId, jboolean userPremium, jboolean enablePushConnection, jboolean hasNetwork, jint networkType, jint performanceClass) {
     const char *deviceModelStr = env->GetStringUTFChars(deviceModel, 0);
     const char *systemVersionStr = env->GetStringUTFChars(systemVersion, 0);
@@ -517,11 +522,6 @@ void init(JNIEnv *env, jclass c, jint instanceNum, jint version, jint layer, jin
         env->ReleaseStringUTFChars(packageId, packageIdStr);
     }
 }
-
-// TG fork: instances 0..4 exist from the start and get their delegate in
-// setJava below. Instances >= 5 are created lazily (see
-// ConnectionsManager::getInstance) and get their delegate in init().
-static bool tgDelegateReady[MAX_ACCOUNT_COUNT] = {false};
 
 void setJava(JNIEnv *env, jclass c, jboolean useJavaByteBuffers) {
     ConnectionsManager::useJavaVM(java, useJavaByteBuffers);
