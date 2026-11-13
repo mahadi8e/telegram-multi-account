@@ -132,6 +132,11 @@ public class NotificationPermissionDialog extends BottomSheet implements Notific
     public void updateCounter() {
         int counter = 0;
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; ++a) {
+            // TG fork: with up to 100 slots, never create a MessagesStorage
+            // (thread + database) for a slot that has no logged-in account.
+            if (!UserConfig.getInstance(a).isClientActivated()) {
+                continue;
+            }
             MessagesStorage messagesStorage = MessagesStorage.getInstance(a);
             if (messagesStorage != null) {
                 counter += messagesStorage.getMainUnreadCount();

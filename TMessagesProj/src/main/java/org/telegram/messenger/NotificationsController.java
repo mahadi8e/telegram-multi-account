@@ -3491,6 +3491,11 @@ public class NotificationsController extends BaseController implements Notificat
     }
 
     protected void repeatNotificationMaybe() {
+        // TG fork: a dormant (not selected) account must not re-post its
+        // notifications or re-arm this alarm after the user switched away.
+        if (!UserConfig.isLiveAccount(currentAccount)) {
+            return;
+        }
         notificationsQueue.postRunnable(() -> {
             int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
             if (hour >= 11 && hour <= 22) {

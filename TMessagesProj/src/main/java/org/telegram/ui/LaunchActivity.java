@@ -1222,6 +1222,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (BuildVars.LOGS_ENABLED) {
             Log.d("TGSLOT", "switch " + currentAccount + " -> " + account);
         }
+        // TG fork: remember the outgoing account's unread count, so the settings
+        // account list can show its badge while it is dormant without waking
+        // its MessagesStorage.
+        UserConfig.getInstance(currentAccount).tgLastUnreadCount = MessagesStorage.getInstance(currentAccount).getMainUnreadCount();
+        UserConfig.getInstance(currentAccount).saveConfig(false);
         UserConfig.selectedAccount = account;
         UserConfig.getInstance(0).saveConfig(false);
 

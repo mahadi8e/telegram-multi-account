@@ -35,6 +35,9 @@ public class UserConfig extends BaseController {
     public int lastSendMessageId = -210000;
     // TG fork: backlog cutoff used to suppress notification floods after a switch.
     public int tgBacklogCutoff;
+    // TG fork: unread count saved when this account stops being live, so the
+    // settings account list can draw its badge without waking its storage.
+    public int tgLastUnreadCount;
     public int lastBroadcastId = -1;
     public int contactsSavedCount;
     public long clientUserId;
@@ -156,6 +159,7 @@ public class UserConfig extends BaseController {
                     }
                     editor.putBoolean("registeredForPush", registeredForPush);
                     editor.putInt("tgBacklogCutoff", tgBacklogCutoff);
+                    editor.putInt("tgLastUnreadCount", tgLastUnreadCount);
                     editor.putInt("lastSendMessageId", lastSendMessageId);
                     editor.putInt("contactsSavedCount", contactsSavedCount);
                     editor.putInt("lastBroadcastId", lastBroadcastId);
@@ -309,6 +313,7 @@ public class UserConfig extends BaseController {
             }
             registeredForPush = preferences.getBoolean("registeredForPush", false);
             tgBacklogCutoff = preferences.getInt("tgBacklogCutoff", 0);
+            tgLastUnreadCount = preferences.getInt("tgLastUnreadCount", 0);
             lastSendMessageId = preferences.getInt("lastSendMessageId", -210000);
             contactsSavedCount = preferences.getInt("contactsSavedCount", 0);
             lastBroadcastId = preferences.getInt("lastBroadcastId", -1);

@@ -1222,7 +1222,12 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             textView.setLeftDrawable(!botDrawable.isEmpty() ? botDrawable : null);
             textView.setRightDrawable(!emojiStatusDrawable.isEmpty() ? emojiStatusDrawable : null);
 
-            int counter = MessagesStorage.getInstance(account).getMainUnreadCount();
+            // TG fork: for a dormant account, show the unread count saved when it
+            // was last live instead of creating its MessagesStorage (thread + DB)
+            // just to draw this badge.
+            int counter = account == UserConfig.selectedAccount
+                    ? MessagesStorage.getInstance(account).getMainUnreadCount()
+                    : UserConfig.getInstance(account).tgLastUnreadCount;
             counterView.setVisibility(counter > 0 ? View.VISIBLE : View.GONE);
             counterView.setText(LocaleController.formatNumber(counter, ','));
         }
