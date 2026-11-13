@@ -156,6 +156,7 @@ import org.telegram.messenger.ChatThemeController;
 import org.telegram.utils.code.highlight.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.ForkTranslateController;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -469,6 +470,8 @@ public class ChatActivity extends BaseFragment implements
     private ActionBarMenuItem topicsPanelItem;
     private TopicsSidePanel topicsPanel;
     private ActionBarMenuItem.Item translateItem;
+    // TG fork: header-menu item toggling fork-engine auto-translate (Feature 2)
+    private ActionBarMenuItem.Item forkAutoTranslateItem;
     private ActionBarMenuItem searchIconItem;
     private ActionBarMenu.LazyItem audioCallIconItem;
     private boolean searchItemVisible;
@@ -1709,6 +1712,8 @@ public class ChatActivity extends BaseFragment implements
     private final static int open_forum = 61;
 
     private final static int translate = 62;
+    // TG fork: per-chat auto-translate toggle for fork engines (Feature 2)
+    private final static int fork_auto_translate = 76;
     private final static int scheduled = 63;
     private final static int edit_quick_reply = 64;
 
@@ -3988,6 +3993,9 @@ public class ChatActivity extends BaseFragment implements
                     if (!getMessagesController().getTranslateController().toggleTranslatingDialog(getDialogId(), true)) {
                         updateTopPanel(true);
                     }
+                } else if (id == fork_auto_translate) {
+                    // TG fork: toggle fork-engine auto-translate for this chat (Feature 2)
+                    toggleForkAutoTranslate();
                 } else if (id == call || id == video_call) {
                     if (currentUser != null && getParentActivity() != null) {
                         VoIPHelper.startCall(currentUser, id == video_call, userInfo != null && userInfo.video_calls_available, getParentActivity(), getMessagesController().getUserFull(currentUser.id), getAccountInstance());
@@ -4397,6 +4405,12 @@ public class ChatActivity extends BaseFragment implements
             }
             translateItem = headerItem.lazilyAddSubItem(translate, R.drawable.msg_translate, LocaleController.getString(R.string.TranslateMessage));
             updateTranslateItemVisibility();
+            // TG fork: per-chat auto-translate toggle running on the fork engine
+            // (Feature 2). It has its own label and its own persisted dialog set;
+            // the stock translate item above and its Premium gate are untouched.
+            if (SharedConfig.isForkTranslateEngineSelected()) {
+                forkAutoTranslateItem = headerItem.lazilyAddSubItem(fork_auto_translate, R.drawable.msg_translate, LocaleController.getString(R.string.ForkAutoTranslate));
+            }
             if (currentChat != null && !currentChat.creator && !ChatObject.hasAdminRights(currentChat)) {
                 headerItem.lazilyAddSubItem(report, R.drawable.msg_report, LocaleController.getString(R.string.ReportChat));
             }
@@ -11753,6 +11767,99 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         translateItem.setVisibility(getMessagesController().getTranslateController().isTranslateDialogHidden(getDialogId()) && getMessagesController().getTranslateController().isDialogTranslatable(getDialogId()) ? View.VISIBLE : View.GONE);
+    }
+
+    // TG fork: toggles fork-engine auto-translate for the current dialog
+    // (Feature 2). State lives in ForkTranslateController's own persisted set;
+    // nothing here touches the stock TranslateController or its Premium gate.
+    private void toggleForkAutoTranslate() {
+        final ForkTranslateController controller = ForkTranslateController.getInstance(currentAccount);
+        final boolean enable = !controller.isAutoTranslateDialog(getDialogId());
+        if (enable && SharedConfig.isForkCloudEngine(SharedConfig.forkTranslateEngine)) {
+            if (DialogObject.isEncryptedDialog(getDialogId())) {
+                BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.ForkTranslateSecretChatCloudBlocked), themeDelegate).show();
+                return;
+            }
+            if (!SharedConfig.forkCloudTranslateConsent) {
+                showForkCloudConsent(this::toggleForkAutoTranslate);
+                return;
+            }
+        }
+        controller.setAutoTranslateDialog(getDialogId(), enable, TranslateAlert2.getToLanguage());
+        BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(enable ? R.string.ForkAutoTranslateOn : R.string.ForkAutoTranslateOff)).show();
+        if (enable) {
+            controller.translateMessagesIfNeeded(getDialogId(), new ArrayList<>(messages));
+        }
+    }
+
+    // TG fork: one-shot privacy notice shown before the first use of a cloud
+    // translation engine (Feature 2). Consent is remembered in SharedConfig.
+    private void showForkCloudConsent(Runnable onConsent) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setTitle(LocaleController.getString(R.string.ForkTranslateCloudNoticeTitle))
+                .setMessage(LocaleController.formatString("ForkTranslateCloudNotice", R.string.ForkTranslateCloudNotice, ForkTranslateAlert.getEngineName(SharedConfig.forkTranslateEngine)))
+                .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
+                    SharedConfig.setForkCloudTranslateConsent(true);
+                    if (onConsent != null) {
+                        onConsent.run();
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create());
+    }
+
+    // TG fork: manual translation through the selected fork engine
+    // (Feature 2). The result is presented in the fork bottom sheet; the
+    // message bubble and the stock server-engine flow are not touched.
+    private void showForkTranslation(MessageObject messageObject, CharSequence text, String toLanguage) {
+        if (getParentActivity() == null || messageObject == null || text == null) {
+            return;
+        }
+        final int engine = SharedConfig.forkTranslateEngine;
+        if (SharedConfig.isForkCloudEngine(engine)) {
+            // TG fork privacy rule: cloud engines are refused in secret chats.
+            if (DialogObject.isEncryptedDialog(getDialogId())) {
+                showDialog(new AlertDialog.Builder(getParentActivity())
+                        .setTitle(LocaleController.getString(R.string.ForkTranslateCloudNoticeTitle))
+                        .setMessage(LocaleController.getString(R.string.ForkTranslateSecretChatCloudBlocked))
+                        .setPositiveButton(LocaleController.getString(R.string.OK), null)
+                        .create());
+                return;
+            }
+            if (!SharedConfig.forkCloudTranslateConsent) {
+                showForkCloudConsent(() -> showForkTranslation(messageObject, text, toLanguage));
+                return;
+            }
+        }
+        final ForkTranslateAlert alert = ForkTranslateAlert.show(getParentActivity(), getResourceProvider(), ForkTranslateAlert.getEngineName(engine), text.toString());
+        ForkTranslateController.getInstance(currentAccount).translateText(getDialogId(), messageObject.getId(), text.toString(), toLanguage, new ForkTranslateController.Callback() {
+            @Override
+            public void onSuccess(String translatedText, String detectedFromLanguage) {
+                alert.setResult(translatedText);
+            }
+
+            @Override
+            public void onError(int errorCode, String detail) {
+                alert.setError(forkTranslateErrorText(errorCode));
+            }
+        });
+    }
+
+    // TG fork: user-facing text for fork translation errors (Feature 2)
+    private String forkTranslateErrorText(int errorCode) {
+        switch (errorCode) {
+            case ForkTranslateController.ERROR_ENGINE_UNAVAILABLE:
+                return LocaleController.getString(R.string.ForkTranslateEngineUnavailable);
+            case ForkTranslateController.ERROR_NO_API_KEY:
+                return LocaleController.getString(R.string.ForkTranslateNoApiKey);
+            case ForkTranslateController.ERROR_CLOUD_IN_SECRET_CHAT:
+                return LocaleController.getString(R.string.ForkTranslateSecretChatCloudBlocked);
+            default:
+                return LocaleController.getString(R.string.TranslationFailedAlert2);
+        }
     }
 
     private Animator infoTopViewAnimator;
@@ -21312,6 +21419,12 @@ public class ChatActivity extends BaseFragment implements
     public void didReceivedNotification(int id, int account, final Object... args) {
         if (id == NotificationCenter.messagesDidLoad) {
             didReceivedNotification_messagesDidLoad(id, account, args);
+            // TG fork: fork-engine auto-translate for the loaded messages of
+            // dialogs the user enabled it for (Feature 2). The controller
+            // returns immediately for any other dialog.
+            if (account == currentAccount) {
+                ForkTranslateController.getInstance(currentAccount).translateMessagesIfNeeded(getDialogId(), new ArrayList<>(messages));
+            }
         } else {
             didReceivedNotification2(id, account, args);
             didReceivedNotification3(id, account, args);
@@ -32806,7 +32919,22 @@ public class ChatActivity extends BaseFragment implements
                         TLRPC.InputPeer inputPeer = selectedObject != null && (selectedObject.isPoll() || selectedObject.isVoiceTranscriptionOpen() || selectedObject.isSponsored() || selectedObject.scheduled || chatMode == MODE_QUICK_REPLIES) ? null : getMessagesController().getInputPeer(dialog_id);
 //                        final boolean shouldTranslateByText = selectedObject != null && (selectedObject.isPoll() || selectedObject.isVoiceTranscriptionOpen() || selectedObject.isSponsored() || selectedObject.scheduled || chatMode == MODE_QUICK_REPLIES);
                         final TL_iv.RichMessage richMessageToTranslate = selectedObject != null && selectedObject.type == MessageObject.TYPE_ARTICLE && selectedObject.messageOwner != null ? selectedObject.messageOwner.rich_message : null;
-                        if (richMessageToTranslate != null) {
+                        // TG fork: when a fork translation engine is selected, the
+                        // Translate item runs it (cache-first, see ForkTranslateController)
+                        // instead of the Telegram server engine. The stock branches
+                        // below stay untouched and are used whenever the Telegram
+                        // engine is selected. (Feature 2)
+                        if (SharedConfig.isForkTranslateEngineSelected()) {
+                            cell.setVisibility(finalMessageText != null && finalMessageText.length() > 0 ? View.VISIBLE : View.GONE);
+                            final MessageObject forkMessageObject = selectedObject;
+                            cell.setOnClickListener(e -> {
+                                if (forkMessageObject == null || getParentActivity() == null) {
+                                    return;
+                                }
+                                showForkTranslation(forkMessageObject, finalMessageText, toLang);
+                                closeMenu(false);
+                            });
+                        } else if (richMessageToTranslate != null) {
                             final String fromLang = selectedObject.messageOwner.originalLanguage;
                             cell.setVisibility(View.VISIBLE);
                             cell.setOnClickListener(e -> {

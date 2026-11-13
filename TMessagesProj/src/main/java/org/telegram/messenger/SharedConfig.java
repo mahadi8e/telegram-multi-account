@@ -149,6 +149,47 @@ public class SharedConfig {
                 .apply();
     }
 
+    // TG fork: setters for the translation engine settings (Feature 2)
+    public static void setForkTranslateEnabled(boolean value) {
+        forkTranslateEnabled = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkTranslateEnabled", value)
+                .apply();
+    }
+
+    public static void setForkTranslateEngine(int value) {
+        forkTranslateEngine = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkTranslateEngine", value)
+                .apply();
+    }
+
+    public static void setForkTranslateGoogleKey(String value) {
+        forkTranslateGoogleKey = value == null ? "" : value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("forkTranslateGoogleKey", forkTranslateGoogleKey)
+                .apply();
+    }
+
+    public static void setForkTranslateDeeplKey(String value) {
+        forkTranslateDeeplKey = value == null ? "" : value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("forkTranslateDeeplKey", forkTranslateDeeplKey)
+                .apply();
+    }
+
+    public static void setForkCloudTranslateConsent(boolean value) {
+        forkCloudTranslateConsent = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkCloudTranslateConsent", value)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -278,6 +319,27 @@ public class SharedConfig {
     public static boolean payByInvoice;
     // TG fork: master switch for the local folders & pins feature (device-only data)
     public static boolean localFoldersEnabled = true;
+    // TG fork: translation engine selection (Feature 2). These values only
+    // govern the fork's own translation paths; the stock Telegram server
+    // engine and all of its UI/gates are untouched. API keys are the user's
+    // own, are kept only in these prefs and are never logged.
+    public static final int FORK_TRANSLATE_ENGINE_TELEGRAM = 0;
+    public static final int FORK_TRANSLATE_ENGINE_MLKIT = 1;
+    public static final int FORK_TRANSLATE_ENGINE_GOOGLE = 2;
+    public static final int FORK_TRANSLATE_ENGINE_DEEPL = 3;
+    public static boolean forkTranslateEnabled = true;
+    public static int forkTranslateEngine = FORK_TRANSLATE_ENGINE_MLKIT;
+    public static String forkTranslateGoogleKey = "";
+    public static String forkTranslateDeeplKey = "";
+    public static boolean forkCloudTranslateConsent = false;
+
+    public static boolean isForkTranslateEngineSelected() {
+        return forkTranslateEnabled && forkTranslateEngine != FORK_TRANSLATE_ENGINE_TELEGRAM;
+    }
+
+    public static boolean isForkCloudEngine(int engine) {
+        return engine == FORK_TRANSLATE_ENGINE_GOOGLE || engine == FORK_TRANSLATE_ENGINE_DEEPL;
+    }
     public static int stealthModeSendMessageConfirm = 2;
     private static int lastLocalId = -210000;
     public static boolean walletUseFingerprintLock = true;
@@ -695,6 +757,12 @@ public class SharedConfig {
             payByInvoice = preferences.getBoolean("payByInvoice", false);
             // TG fork: local folders & pins feature switch (default on)
             localFoldersEnabled = preferences.getBoolean("localFoldersEnabled", true);
+            // TG fork: translation engine settings (Feature 2); ML Kit is the default engine
+            forkTranslateEnabled = preferences.getBoolean("forkTranslateEnabled", true);
+            forkTranslateEngine = preferences.getInt("forkTranslateEngine", FORK_TRANSLATE_ENGINE_MLKIT);
+            forkTranslateGoogleKey = preferences.getString("forkTranslateGoogleKey", "");
+            forkTranslateDeeplKey = preferences.getString("forkTranslateDeeplKey", "");
+            forkCloudTranslateConsent = preferences.getBoolean("forkCloudTranslateConsent", false);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);

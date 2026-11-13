@@ -714,6 +714,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private ArrayList<Integer> accountNumbers = new ArrayList<>();
+    // TG fork: subtitle of the translation-engine settings row (Feature 2)
+    private String forkTranslateEngineSubtitle() {
+        switch (SharedConfig.forkTranslateEngine) {
+            case SharedConfig.FORK_TRANSLATE_ENGINE_GOOGLE:
+                return getString(R.string.ForkTranslateEngineGoogle);
+            case SharedConfig.FORK_TRANSLATE_ENGINE_DEEPL:
+                return getString(R.string.ForkTranslateEngineDeepl);
+            case SharedConfig.FORK_TRANSLATE_ENGINE_TELEGRAM:
+                return getString(R.string.ForkTranslateEngineTelegram);
+            default:
+                return getString(R.string.ForkTranslateEngineMlKit);
+        }
+    }
+
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (searchItem.isSearchFieldVisible2()) {
             items.add(UItem.asSpace(ActionBar.getCurrentActionBarHeight()));
@@ -806,6 +820,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+        // TG fork: fork translation engine settings (Feature 2)
+        items.add(SettingCell.Factory.of(29, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.ForkTranslationEngine), forkTranslateEngineSubtitle()));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -949,6 +965,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 10:
                 presentSettingFragment(new LanguageSelectActivity());
+                break;
+            // TG fork: fork translation engine settings screen
+            case 29:
+                presentSettingFragment(new ForkTranslateSettingsActivity());
                 break;
 
             case 11:

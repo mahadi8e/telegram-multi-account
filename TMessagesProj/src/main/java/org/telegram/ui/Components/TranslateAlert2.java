@@ -456,45 +456,21 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36"
     };
     private void translateAlt() {
-        final String text = reqText == null ? "" : reqText.toString();
-        String _fromLng = fromLanguage;
-        if (_fromLng != null) {
-            _fromLng = _fromLng.split("_")[0];
+        // TG fork: the stock fallback scraped an unofficial Google Translate
+        // web endpoint with spoofed browser user agents, which violates
+        // Google's API terms, so it is disabled in this fork. Report failure
+        // through the same error path the fallback itself used on failure.
+        // (Feature 2 provides compliant alternatives instead: on-device
+        // ML Kit and official key-based Google Cloud / DeepL engines.)
+        if (isDismissed()) return;
+        if (firstTranslation) {
+            dismiss();
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.getString(R.string.TranslationFailedAlert2));
+        } else {
+            BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.TranslationFailedAlert2)).show();
+            headerView.toLanguageTextView.setText(languageName(toLanguage = prevToLanguage));
+            adapter.updateMainView(textViewContainer);
         }
-        if ("nb".equals(_fromLng)) {
-            _fromLng = "no";
-        }
-        final String fromLng = _fromLng;
-        String _toLng = toLanguage;
-        if (_toLng != null) {
-            _toLng = _toLng.split("_")[0];
-        }
-        if ("nb".equals(_toLng)) {
-            _toLng = "no";
-        }
-        final String toLng = _toLng;
-
-        alternativeTranslate(text, fromLng, toLng, (res, rateLimit) -> {
-            if (res != null) {
-                firstTranslation = false;
-                textView.setText(preprocessText(res));
-                adapter.updateMainView(textViewContainer);
-            } else {
-                if (isDismissed()) return;
-//                if ("system".equals(MessagesController.getInstance(currentAccount).translationsManualEnabled)) {
-//                    translateSystem();
-//                    return;
-//                }
-                if (firstTranslation) {
-                    dismiss();
-                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.getString(rateLimit ? R.string.TranslationFailedAlert1 : R.string.TranslationFailedAlert2));
-                } else {
-                    BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createErrorBulletin(LocaleController.getString(rateLimit ? R.string.TranslationFailedAlert1 : R.string.TranslationFailedAlert2)).show();
-                    headerView.toLanguageTextView.setText(languageName(toLanguage = prevToLanguage));
-                    adapter.updateMainView(textViewContainer);
-                }
-            }
-        });
     }
 
     private static int lastIndexOfSafe(String text, String target, int start, int end) {
