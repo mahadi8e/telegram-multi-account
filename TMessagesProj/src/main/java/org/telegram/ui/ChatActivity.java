@@ -157,6 +157,7 @@ import org.telegram.utils.code.highlight.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.ForkTranslateController;
+import org.telegram.messenger.ForkTranscribeController;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -1297,6 +1298,9 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_VIEW_STATISTICS = 115;
     public final static int OPTION_WELCOME_REVERT = 116;
     public final static int OPTION_SEND_MONEY = 117;
+    // TG fork: fork voice-to-text (Feature 3). Stock OPTION_TRANSCRIBE = 30
+    // is a dead constant and is deliberately not reused.
+    public final static int OPTION_FORK_TRANSCRIBE = 118;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -11859,6 +11863,78 @@ public class ChatActivity extends BaseFragment implements
                 return LocaleController.getString(R.string.ForkTranslateSecretChatCloudBlocked);
             default:
                 return LocaleController.getString(R.string.TranslationFailedAlert2);
+        }
+    }
+
+    // TG fork: one-shot privacy notice shown before the first use of a
+    // cloud voice-to-text engine (Feature 3). Consent is remembered in
+    // SharedConfig, separately from the translation consent.
+    private void showForkSttConsent(Runnable onConsent) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setTitle(LocaleController.getString(R.string.ForkSttCloudNoticeTitle))
+                .setMessage(LocaleController.formatString("ForkSttCloudNotice", R.string.ForkSttCloudNotice, ForkTranscribeAlert.getEngineName(SharedConfig.forkSttEngine)))
+                .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
+                    SharedConfig.setForkSttCloudConsent(true);
+                    if (onConsent != null) {
+                        onConsent.run();
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create());
+    }
+
+    // TG fork: manual voice transcription through the selected fork engine
+    // (Feature 3). The result is presented in the fork bottom sheet; the
+    // message bubble, the stock TranscribeButton and the server-owned
+    // voiceTranscription fields are not touched.
+    private void showForkTranscription(MessageObject messageObject) {
+        if (getParentActivity() == null || messageObject == null) {
+            return;
+        }
+        // TG fork privacy rule: all v1 engines are cloud, so secret chats
+        // are refused here (and again inside ForkTranscribeController).
+        if (DialogObject.isEncryptedDialog(getDialogId())) {
+            showDialog(new AlertDialog.Builder(getParentActivity())
+                    .setTitle(LocaleController.getString(R.string.ForkSttCloudNoticeTitle))
+                    .setMessage(LocaleController.getString(R.string.ForkSttSecretChatBlocked))
+                    .setPositiveButton(LocaleController.getString(R.string.OK), null)
+                    .create());
+            return;
+        }
+        if (!SharedConfig.forkSttCloudConsent) {
+            showForkSttConsent(() -> showForkTranscription(messageObject));
+            return;
+        }
+        final ForkTranscribeAlert alert = ForkTranscribeAlert.show(getParentActivity(), getResourceProvider(), ForkTranscribeAlert.getEngineName(SharedConfig.forkSttEngine));
+        ForkTranscribeController.getInstance(currentAccount).transcribe(messageObject, new ForkTranscribeController.Callback() {
+            @Override
+            public void onSuccess(String text, String detectedLanguage) {
+                alert.setResult(text, detectedLanguage);
+            }
+
+            @Override
+            public void onError(int errorCode, String detail) {
+                alert.setError(forkSttErrorText(errorCode));
+            }
+        });
+    }
+
+    // TG fork: user-facing text for fork voice-to-text errors (Feature 3)
+    private String forkSttErrorText(int errorCode) {
+        switch (errorCode) {
+            case ForkTranscribeController.ERROR_SECRET_CHAT:
+                return LocaleController.getString(R.string.ForkSttSecretChatBlocked);
+            case ForkTranscribeController.ERROR_TTL_MEDIA:
+                return LocaleController.getString(R.string.ForkSttTtlBlocked);
+            case ForkTranscribeController.ERROR_NOT_DOWNLOADED:
+                return LocaleController.getString(R.string.ForkSttNotDownloaded);
+            case ForkTranscribeController.ERROR_NO_API_KEY:
+                return LocaleController.getString(R.string.ForkSttNoApiKey);
+            default:
+                return LocaleController.getString(R.string.ForkSttFailed);
         }
     }
 
@@ -34407,6 +34483,11 @@ public class ChatActivity extends BaseFragment implements
                 createDeleteMessagesAlert(selectedObject, selectedObjectGroup, true);
                 break;
             }
+            case OPTION_FORK_TRANSCRIBE: {
+                // TG fork: fork voice-to-text (Feature 3)
+                showForkTranscription(selectedObject);
+                break;
+            }
             case OPTION_FORWARD: {
                 if (getMessagesController().isFrozen()) {
                     AccountFrozenAlert.show(currentAccount);
@@ -46700,6 +46781,15 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_GIFT);
                     icons.add(R.drawable.menu_gift);
                 }
+            }
+            // TG fork: fork voice-to-text entry point (Feature 3). Shown only
+            // for voice messages while the feature is enabled, and never in
+            // secret chats (all v1 engines are cloud). The stock transcribe
+            // button and its Premium flow are untouched.
+            if (SharedConfig.forkSttEnabled && selectedObject != null && selectedObject.isVoice() && !DialogObject.isEncryptedDialog(dialog_id)) {
+                items.add(LocaleController.getString(R.string.ForkSttTranscribe));
+                options.add(OPTION_FORK_TRANSCRIBE);
+                icons.add(R.drawable.msg_message);
             }
             if (message.canDeleteMessage(chatMode == MODE_SCHEDULED, currentChat) && (threadMessageObjects == null || !threadMessageObjects.contains(message)) && !(message != null && message.messageOwner != null && message.messageOwner.action instanceof TLRPC.TL_messageActionTopicCreate)) {
                 items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));

@@ -728,6 +728,19 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    // TG fork: subtitle of the voice-to-text settings row (Feature 3)
+    private String forkSttSubtitle() {
+        if (!SharedConfig.forkSttEnabled) {
+            return getString(R.string.ForkSttOff);
+        }
+        switch (SharedConfig.forkSttEngine) {
+            case SharedConfig.FORK_STT_ENGINE_GOOGLE:
+                return getString(R.string.ForkSttEngineGoogle);
+            default:
+                return getString(R.string.ForkSttEngineOpenAi);
+        }
+    }
+
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (searchItem.isSearchFieldVisible2()) {
             items.add(UItem.asSpace(ActionBar.getCurrentActionBarHeight()));
@@ -822,6 +835,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
         // TG fork: fork translation engine settings (Feature 2)
         items.add(SettingCell.Factory.of(29, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.ForkTranslationEngine), forkTranslateEngineSubtitle()));
+        // TG fork: fork voice-to-text engine settings (Feature 3)
+        items.add(SettingCell.Factory.of(30, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_sounds, getString(R.string.ForkSttSettings), forkSttSubtitle()));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -969,6 +984,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             // TG fork: fork translation engine settings screen
             case 29:
                 presentSettingFragment(new ForkTranslateSettingsActivity());
+                break;
+            // TG fork: fork voice-to-text engine settings screen
+            case 30:
+                presentSettingFragment(new ForkSttSettingsActivity());
                 break;
 
             case 11:

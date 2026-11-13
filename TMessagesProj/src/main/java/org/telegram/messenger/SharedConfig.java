@@ -190,6 +190,47 @@ public class SharedConfig {
                 .apply();
     }
 
+    // TG fork: setters for the voice-to-text engine settings (Feature 3)
+    public static void setForkSttEnabled(boolean value) {
+        forkSttEnabled = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkSttEnabled", value)
+                .apply();
+    }
+
+    public static void setForkSttEngine(int value) {
+        forkSttEngine = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkSttEngine", value)
+                .apply();
+    }
+
+    public static void setForkSttOpenAiKey(String value) {
+        forkSttOpenAiKey = value == null ? "" : value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("forkSttOpenAiKey", forkSttOpenAiKey)
+                .apply();
+    }
+
+    public static void setForkSttGoogleKey(String value) {
+        forkSttGoogleKey = value == null ? "" : value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("forkSttGoogleKey", forkSttGoogleKey)
+                .apply();
+    }
+
+    public static void setForkSttCloudConsent(boolean value) {
+        forkSttCloudConsent = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkSttCloudConsent", value)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -332,6 +373,19 @@ public class SharedConfig {
     public static String forkTranslateGoogleKey = "";
     public static String forkTranslateDeeplKey = "";
     public static boolean forkCloudTranslateConsent = false;
+    // TG fork: voice-to-text engine selection (Feature 3). Both v1 engines
+    // are cloud services reached with the user's own API keys; audio from
+    // secret chats and self-destructing voice messages is never sent, and
+    // the stock (Premium-gated) server transcription is untouched. The
+    // master switch defaults to OFF because the feature sends audio to a
+    // third party. API keys are kept only in these prefs and never logged.
+    public static final int FORK_STT_ENGINE_OPENAI = 0;
+    public static final int FORK_STT_ENGINE_GOOGLE = 1;
+    public static boolean forkSttEnabled = false;
+    public static int forkSttEngine = FORK_STT_ENGINE_OPENAI;
+    public static String forkSttOpenAiKey = "";
+    public static String forkSttGoogleKey = "";
+    public static boolean forkSttCloudConsent = false;
 
     public static boolean isForkTranslateEngineSelected() {
         return forkTranslateEnabled && forkTranslateEngine != FORK_TRANSLATE_ENGINE_TELEGRAM;
@@ -763,6 +817,12 @@ public class SharedConfig {
             forkTranslateGoogleKey = preferences.getString("forkTranslateGoogleKey", "");
             forkTranslateDeeplKey = preferences.getString("forkTranslateDeeplKey", "");
             forkCloudTranslateConsent = preferences.getBoolean("forkCloudTranslateConsent", false);
+            // TG fork: voice-to-text engine settings (Feature 3); off by default
+            forkSttEnabled = preferences.getBoolean("forkSttEnabled", false);
+            forkSttEngine = preferences.getInt("forkSttEngine", FORK_STT_ENGINE_OPENAI);
+            forkSttOpenAiKey = preferences.getString("forkSttOpenAiKey", "");
+            forkSttGoogleKey = preferences.getString("forkSttGoogleKey", "");
+            forkSttCloudConsent = preferences.getBoolean("forkSttCloudConsent", false);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);
