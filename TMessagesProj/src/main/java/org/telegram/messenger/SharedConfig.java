@@ -256,6 +256,33 @@ public class SharedConfig {
                 .apply();
     }
 
+    // TG fork: setters for the deleted-message vault (Feature 5). The
+    // master switch defaults to OFF and must be enabled explicitly; the
+    // storage cap is kept in megabytes (0 = text only, no media copies).
+    public static void setForkDeletedMessagesEnabled(boolean value) {
+        forkDeletedMessagesEnabled = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkDeletedMessagesEnabled", value)
+                .apply();
+    }
+
+    public static void setForkDeletedMessagesCapMb(int value) {
+        forkDeletedMessagesCapMb = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkDeletedMessagesCapMb", value)
+                .apply();
+    }
+
+    public static void setForkDeletedMessagesConsent(boolean value) {
+        forkDeletedMessagesConsent = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkDeletedMessagesConsent", value)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -423,6 +450,17 @@ public class SharedConfig {
     public static boolean forkCompressEnabled = true;
     public static int forkCompressPhotoPreset = FORK_COMPRESS_PRESET_ORIGINAL;
     public static int forkCompressVideoPreset = FORK_COMPRESS_PRESET_ORIGINAL;
+    // TG fork: deleted-message vault (Feature 5). When the user opts a chat
+    // in, copies of messages the other party deletes are kept in a private
+    // per-account database + media folder inside the app sandbox — never
+    // sent anywhere, never shown to anyone else. Secret chats and
+    // self-destructing messages are structurally excluded, and the user's
+    // own deletions are always really deleted. The master switch defaults
+    // to OFF (unlike Features 1/2/4) because retention must be an explicit,
+    // informed choice.
+    public static boolean forkDeletedMessagesEnabled = false;
+    public static int forkDeletedMessagesCapMb = 200;
+    public static boolean forkDeletedMessagesConsent = false;
 
     public static boolean isForkTranslateEngineSelected() {
         return forkTranslateEnabled && forkTranslateEngine != FORK_TRANSLATE_ENGINE_TELEGRAM;
@@ -864,6 +902,10 @@ public class SharedConfig {
             forkCompressEnabled = preferences.getBoolean("forkCompressEnabled", true);
             forkCompressPhotoPreset = preferences.getInt("forkCompressPhotoPreset", FORK_COMPRESS_PRESET_ORIGINAL);
             forkCompressVideoPreset = preferences.getInt("forkCompressVideoPreset", FORK_COMPRESS_PRESET_ORIGINAL);
+            // TG fork: deleted-message vault (Feature 5); OFF by default
+            forkDeletedMessagesEnabled = preferences.getBoolean("forkDeletedMessagesEnabled", false);
+            forkDeletedMessagesCapMb = preferences.getInt("forkDeletedMessagesCapMb", 200);
+            forkDeletedMessagesConsent = preferences.getBoolean("forkDeletedMessagesConsent", false);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);

@@ -741,6 +741,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    // TG fork: subtitle of the deleted-message vault settings row (Feature 5)
+    private String forkDeletedMessagesSubtitle() {
+        return getString(SharedConfig.forkDeletedMessagesEnabled ? R.string.ForkDeletedMessagesOn : R.string.ForkDeletedMessagesOff);
+    }
+
     // TG fork: subtitle of the media compression settings row (Feature 4):
     // the current photo and video preset names
     private String forkCompressSubtitle() {
@@ -859,6 +864,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(30, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_sounds, getString(R.string.ForkSttSettings), forkSttSubtitle()));
         // TG fork: fork media compression preset settings (Feature 4)
         items.add(SettingCell.Factory.of(31, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_data, getString(R.string.ForkCompressSettings), forkCompressSubtitle()));
+        // TG fork: fork deleted-message vault settings (Feature 5)
+        items.add(SettingCell.Factory.of(32, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_privacy, getString(R.string.ForkDeletedMessagesSettings), forkDeletedMessagesSubtitle()));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -1014,6 +1021,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             // TG fork: fork media compression preset settings screen
             case 31:
                 presentSettingFragment(new ForkCompressSettingsActivity());
+                break;
+            // TG fork: fork deleted-message vault settings screen
+            case 32:
+                presentSettingFragment(new ForkDeletedMessagesSettingsActivity());
                 break;
 
             case 11:

@@ -9352,6 +9352,13 @@ public class MessagesController extends BaseController implements NotificationCe
         if ((messages == null || messages.isEmpty()) && taskId == 0) {
             return;
         }
+        // TG fork: remember ids the user deletes themselves, so the Feature 5
+        // snapshot can never retain them even if a delete update races in
+        // (race insurance only — own deletes remove the rows locally below,
+        // before any server echo could present them to the snapshot).
+        if (randoms == null && mode == 0 && dialogId != 0 && messages != null && !messages.isEmpty() && SharedConfig.forkDeletedMessagesEnabled) {
+            ForkDeletedMessagesController.getInstance(currentAccount).noteDeletedByMe(dialogId, messages);
+        }
         ArrayList<Integer> toSend = null;
         long channelId;
         if (taskId == 0) {
@@ -10028,6 +10035,12 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void deleteDialog(final long did, int onlyHistory, boolean revoke) {
+        // TG fork: deleting a dialog or clearing its history locally also
+        // purges the chat's retained deleted-message copies (Feature 5), so
+        // the user's own bulk deletion leaves no shadow copy behind.
+        if (SharedConfig.forkDeletedMessagesEnabled) {
+            getMessagesStorage().getStorageQueue().postRunnable(() -> ForkDeletedMessagesController.getInstance(currentAccount).purgeDialog(did));
+        }
         deleteDialog(did, 1, onlyHistory, 0, revoke, null, 0);
     }
 
@@ -21325,6 +21338,22 @@ public class MessagesController extends BaseController implements NotificationCe
             for (int a = 0, size = deletedMessages.size(); a < size; a++) {
                 long key = deletedMessages.keyAt(a);
                 ArrayList<Integer> arrayList = deletedMessages.valueAt(a);
+                // TG fork: Feature 5 snapshot — posted to the same serial
+                // storage queue immediately ahead of the stock deletion
+                // runnable below, so it reads the rows before they are
+                // removed. Only delete updates collected above reach this
+                // block (TL_updateDeleteMessages under key 0 and
+                // TL_updateDeleteChannelMessages under -channel_id); secret
+                // chats delete through SecretChatHelper and never pass here.
+                // No-op unless the feature is on and a chat is opted in.
+                if (SharedConfig.forkDeletedMessagesEnabled) {
+                    ForkDeletedMessagesController forkDeletedController = ForkDeletedMessagesController.getInstance(currentAccount);
+                    if (key != 0 ? forkDeletedController.isOptedIn(key) : forkDeletedController.hasOptedInDialogs()) {
+                        final long snapshotKey = key;
+                        final ArrayList<Integer> snapshotIds = new ArrayList<>(arrayList);
+                        getMessagesStorage().getStorageQueue().postRunnable(() -> forkDeletedController.snapshotBeforeDelete(snapshotKey, snapshotIds));
+                    }
+                }
                 getMessagesStorage().getStorageQueue().postRunnable(() -> {
                     ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
                     getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds);
@@ -21357,6 +21386,14 @@ public class MessagesController extends BaseController implements NotificationCe
                     ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, id, false, true);
                     getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, new ArrayList<>(), dialogIds);
                 });
+                // TG fork: a cleared history (own action or applied from
+                // another device) also purges this chat's retained copies
+                // (Feature 5) — retention never hooks the clear itself.
+                // Posted after the stock runnable on the same queue, so a
+                // snapshot from this same batch cannot resurrect them.
+                if (SharedConfig.forkDeletedMessagesEnabled) {
+                    getMessagesStorage().getStorageQueue().postRunnable(() -> ForkDeletedMessagesController.getInstance(currentAccount).purgeDialog(key));
+                }
             }
         }
         if (tasks != null) {

@@ -158,6 +158,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.ForkTranslateController;
 import org.telegram.messenger.ForkTranscribeController;
+import org.telegram.messenger.ForkDeletedMessagesController;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
@@ -473,6 +474,9 @@ public class ChatActivity extends BaseFragment implements
     private ActionBarMenuItem.Item translateItem;
     // TG fork: header-menu item toggling fork-engine auto-translate (Feature 2)
     private ActionBarMenuItem.Item forkAutoTranslateItem;
+    // TG fork: header-menu items for deleted-message retention (Feature 5)
+    private ActionBarMenuItem.Item forkKeepDeletedItem;
+    private ActionBarMenuItem.Item forkDeletedMessagesItem;
     private ActionBarMenuItem searchIconItem;
     private ActionBarMenu.LazyItem audioCallIconItem;
     private boolean searchItemVisible;
@@ -1718,6 +1722,9 @@ public class ChatActivity extends BaseFragment implements
     private final static int translate = 62;
     // TG fork: per-chat auto-translate toggle for fork engines (Feature 2)
     private final static int fork_auto_translate = 76;
+    // TG fork: per-chat deleted-message retention controls (Feature 5)
+    private final static int fork_keep_deleted = 77;
+    private final static int fork_deleted_messages = 78;
     private final static int scheduled = 63;
     private final static int edit_quick_reply = 64;
 
@@ -4000,6 +4007,14 @@ public class ChatActivity extends BaseFragment implements
                 } else if (id == fork_auto_translate) {
                     // TG fork: toggle fork-engine auto-translate for this chat (Feature 2)
                     toggleForkAutoTranslate();
+                } else if (id == fork_keep_deleted) {
+                    // TG fork: toggle deleted-message retention for this chat (Feature 5)
+                    toggleForkKeepDeleted();
+                } else if (id == fork_deleted_messages) {
+                    // TG fork: open the retained-messages vault for this chat (Feature 5)
+                    Bundle vaultArgs = new Bundle();
+                    vaultArgs.putLong("dialog_id", getDialogId());
+                    presentFragment(new ForkDeletedMessagesActivity(vaultArgs));
                 } else if (id == call || id == video_call) {
                     if (currentUser != null && getParentActivity() != null) {
                         VoIPHelper.startCall(currentUser, id == video_call, userInfo != null && userInfo.video_calls_available, getParentActivity(), getMessagesController().getUserFull(currentUser.id), getAccountInstance());
@@ -4414,6 +4429,15 @@ public class ChatActivity extends BaseFragment implements
             // the stock translate item above and its Premium gate are untouched.
             if (SharedConfig.isForkTranslateEngineSelected()) {
                 forkAutoTranslateItem = headerItem.lazilyAddSubItem(fork_auto_translate, R.drawable.msg_translate, LocaleController.getString(R.string.ForkAutoTranslate));
+            }
+            // TG fork: deleted-message retention (Feature 5). Offered only
+            // when the feature is globally on; secret chats and Saved
+            // Messages are hard-excluded (the controller refuses them too).
+            // The vault entry itself is visible only for opted-in chats.
+            if (SharedConfig.forkDeletedMessagesEnabled && currentEncryptedChat == null && getDialogId() != getUserConfig().getClientUserId()) {
+                forkKeepDeletedItem = headerItem.lazilyAddSubItem(fork_keep_deleted, R.drawable.msg_delete, LocaleController.getString(R.string.ForkKeepDeletedMessages));
+                forkDeletedMessagesItem = headerItem.lazilyAddSubItem(fork_deleted_messages, R.drawable.msg_delete, LocaleController.getString(R.string.ForkDeletedMessagesTitle));
+                updateForkDeletedMessagesItems();
             }
             if (currentChat != null && !currentChat.creator && !ChatObject.hasAdminRights(currentChat)) {
                 headerItem.lazilyAddSubItem(report, R.drawable.msg_report, LocaleController.getString(R.string.ReportChat));
@@ -11807,6 +11831,49 @@ public class ChatActivity extends BaseFragment implements
                 .setMessage(LocaleController.formatString("ForkTranslateCloudNotice", R.string.ForkTranslateCloudNotice, ForkTranslateAlert.getEngineName(SharedConfig.forkTranslateEngine)))
                 .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
                     SharedConfig.setForkCloudTranslateConsent(true);
+                    if (onConsent != null) {
+                        onConsent.run();
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create());
+    }
+
+    // TG fork: the vault entry in the header menu is visible only while
+    // this chat is opted in to deleted-message retention (Feature 5).
+    private void updateForkDeletedMessagesItems() {
+        if (forkDeletedMessagesItem != null) {
+            boolean optedIn = ForkDeletedMessagesController.getInstance(currentAccount).isOptedIn(getDialogId());
+            forkDeletedMessagesItem.setVisibility(optedIn ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    // TG fork: toggles deleted-message retention for the current dialog
+    // (Feature 5). State lives in ForkDeletedMessagesController's persisted
+    // opt-in set; opting out also purges this chat's retained copies.
+    private void toggleForkKeepDeleted() {
+        final ForkDeletedMessagesController controller = ForkDeletedMessagesController.getInstance(currentAccount);
+        final boolean enable = !controller.isOptedIn(getDialogId());
+        if (enable && !SharedConfig.forkDeletedMessagesConsent) {
+            showForkDeletedMessagesConsent(this::toggleForkKeepDeleted);
+            return;
+        }
+        controller.setOptedIn(getDialogId(), enable);
+        BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(enable ? R.string.ForkKeepDeletedOn : R.string.ForkKeepDeletedOff)).show();
+        updateForkDeletedMessagesItems();
+    }
+
+    // TG fork: one-shot disclosure shown before retention is first enabled
+    // anywhere (Feature 5), mirroring the fork cloud consents.
+    private void showForkDeletedMessagesConsent(Runnable onConsent) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setTitle(LocaleController.getString(R.string.ForkDeletedMessagesConsentTitle))
+                .setMessage(LocaleController.getString(R.string.ForkDeletedMessagesInfo))
+                .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> {
+                    SharedConfig.setForkDeletedMessagesConsent(true);
                     if (onConsent != null) {
                         onConsent.run();
                     }
