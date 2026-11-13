@@ -518,6 +518,16 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 return SharedConfig.photoHighQualityDefault;
             return highQuality;
         }
+        // TG fork: per-entry photo compression preset (Feature 4), mirroring
+        // highQuality: null = not chosen in the picker, the SharedConfig
+        // default applies. 0 = Original, 1 = Medium, 2 = Small.
+        @Nullable
+        public Integer forkPhotoPreset;
+        public int getForkPhotoPreset() {
+            if (forkPhotoPreset == null)
+                return SharedConfig.forkCompressPhotoPreset;
+            return forkPhotoPreset;
+        }
 
         public CropState cropState;
 

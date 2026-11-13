@@ -242,10 +242,13 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     public final static int preview = 7;
     public final static int caption = 8;
     public final static int stars = 9;
+    // TG fork: photo compression preset row in the attach menu (Feature 4)
+    public final static int fork_quality = 10;
 
     private ActionBarMenuSubItem spoilerItem;
     private ActionBarMenuSubItem compressItem;
     private ActionBarMenuSubItem qualityItem;
+    private ActionBarMenuSubItem forkCompressItem;
     private ActionBarMenuSubItem starsItem;
     protected ActionBarMenuSubItem previewItem;
     public MessagePreviewView.ToggleButton captionItem;
@@ -789,6 +792,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         parentAlert.selectedMenuItem.addColoredGap(media_gap);
         spoilerItem = parentAlert.selectedMenuItem.addSubItem(spoiler, R.drawable.msg_spoiler, LocaleController.getString(R.string.EnablePhotoSpoiler));
         qualityItem = parentAlert.selectedMenuItem.addSubItem(quality, R.drawable.menu_quality_hd, getString(R.string.SendInHighQuality));
+        // TG fork: photo compression preset row (Feature 4), next to the stock quality item
+        forkCompressItem = parentAlert.selectedMenuItem.addSubItem(fork_quality, R.drawable.menu_quality_hd, getString(R.string.ForkCompressRowTitle));
         parentAlert.selectedMenuItem.addSubItem(caption, captionItem);
         starsItem = parentAlert.selectedMenuItem.addSubItem(stars, R.drawable.menu_feature_paid, getString(R.string.PaidMediaButton));
         parentAlert.selectedMenuItem.setFitSubItems(true);
@@ -3378,6 +3383,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 if (entry.getValue() instanceof MediaController.PhotoEntry) {
                     MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) entry.getValue();
                     photoEntry.highQuality = highQualityEnabled;
+                    // TG fork: the stock quality toggle wins for this send, so
+                    // keep the compression preset in sync with it (Feature 4)
+                    photoEntry.forkPhotoPreset = highQualityEnabled ? SharedConfig.FORK_COMPRESS_PRESET_ORIGINAL : SharedConfig.FORK_COMPRESS_PRESET_MEDIUM;
                     photoEntry.isChatPreviewSpoilerRevealed = false;
                     photoEntry.isAttachSpoilerRevealed = false;
                     selectedIds.add(photoEntry.imageId);
@@ -3390,10 +3398,38 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     ((PhotoAttachPhotoCell) view).setHighQuality(entry != null && selectedIds.contains(entry.imageId) && finalHighQualityEnabled);
                 }
             });
+            // TG fork: refresh the compression preset row (Feature 4)
+            updateForkCompressItem();
             if (parentAlert.getCurrentAttachLayout() != this) {
                 adapter.notifyDataSetChanged();
             }
 
+            if (parentAlert.getPhotoPreviewLayout() != null) {
+                parentAlert.getPhotoPreviewLayout().invalidateGroupsView();
+            }
+        } else if (id == fork_quality) {
+            // TG fork: cycle the photo compression preset of the whole
+            // selection (Feature 4). Both this row and the stock quality
+            // toggle write PhotoEntry.highQuality as well, so whichever the
+            // user touched last is what the send uses.
+            int nextPreset = (getForkCompressPresetForSelection() + 1) % 3;
+            for (HashMap.Entry<Object, Object> entry : selectedPhotos.entrySet()) {
+                if (entry.getValue() instanceof MediaController.PhotoEntry) {
+                    MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) entry.getValue();
+                    photoEntry.forkPhotoPreset = nextPreset;
+                    photoEntry.highQuality = nextPreset == SharedConfig.FORK_COMPRESS_PRESET_ORIGINAL;
+                }
+            }
+            gridView.forAllChild(view -> {
+                if (view instanceof PhotoAttachPhotoCell) {
+                    MediaController.PhotoEntry entry = ((PhotoAttachPhotoCell) view).getPhotoEntry();
+                    ((PhotoAttachPhotoCell) view).setHighQuality(entry != null && entry.isHighQuality());
+                }
+            });
+            updateForkCompressItem();
+            if (parentAlert.getCurrentAttachLayout() != this) {
+                adapter.notifyDataSetChanged();
+            }
             if (parentAlert.getPhotoPreviewLayout() != null) {
                 parentAlert.getPhotoPreviewLayout().invalidateGroupsView();
             }
@@ -3484,6 +3520,60 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     }
 
     @Override
+    // TG fork: the compression preset shared by the current selection
+    // (Feature 4). Entries that were never touched fall back to the
+    // SharedConfig default, exactly like the row displays it.
+    private int getForkCompressPresetForSelection() {
+        int preset = -1;
+        for (Object value : selectedPhotos.values()) {
+            if (value instanceof MediaController.PhotoEntry) {
+                MediaController.PhotoEntry entry = (MediaController.PhotoEntry) value;
+                if (entry.forkPhotoPreset == null) {
+                    continue;
+                }
+                if (preset == -1) {
+                    preset = entry.forkPhotoPreset;
+                } else if (preset != entry.forkPhotoPreset) {
+                    return SharedConfig.forkCompressPhotoPreset;
+                }
+            }
+        }
+        return preset == -1 ? SharedConfig.forkCompressPhotoPreset : preset;
+    }
+
+    // TG fork: refreshes the compression preset row's text and its subtitle,
+    // which shows the total original size of the current selection (Feature 4).
+    // There is no honest "after" estimate for photos, so only the original
+    // size is shown.
+    private void updateForkCompressItem() {
+        if (forkCompressItem == null) {
+            return;
+        }
+        int preset = getForkCompressPresetForSelection();
+        forkCompressItem.setText(LocaleController.formatString("ForkCompressRow", R.string.ForkCompressRow, LocaleController.getString(forkCompressPresetString(preset))));
+        long totalSize = 0;
+        for (Object value : selectedPhotos.values()) {
+            if (value instanceof MediaController.PhotoEntry) {
+                MediaController.PhotoEntry entry = (MediaController.PhotoEntry) value;
+                if (entry.path != null) {
+                    totalSize += new File(entry.path).length();
+                }
+            }
+        }
+        forkCompressItem.setSubtext(totalSize > 0 ? LocaleController.formatString("ForkCompressOriginalSize", R.string.ForkCompressOriginalSize, AndroidUtilities.formatFileSize(totalSize)) : null);
+    }
+
+    private static int forkCompressPresetString(int preset) {
+        switch (preset) {
+            case SharedConfig.FORK_COMPRESS_PRESET_MEDIUM:
+                return R.string.ForkCompressPresetMedium;
+            case SharedConfig.FORK_COMPRESS_PRESET_SMALL:
+                return R.string.ForkCompressPresetSmall;
+            default:
+                return R.string.ForkCompressPresetOriginal;
+        }
+    }
+
     public void onSelectedItemsCountChanged(int count) {
         final boolean hasCompress;
         final boolean hasGroup;
@@ -3553,6 +3643,14 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 parentAlert.selectedMenuItem.showSubItem(quality);
             } else {
                 parentAlert.selectedMenuItem.hideSubItem(quality);
+            }
+            // TG fork: photo compression preset row (Feature 4) — same
+            // visibility rule as the stock quality item, plus the master switch
+            if (SharedConfig.forkCompressEnabled && getSelectedPhotosCount() == count) {
+                updateForkCompressItem();
+                parentAlert.selectedMenuItem.showSubItem(fork_quality);
+            } else {
+                parentAlert.selectedMenuItem.hideSubItem(fork_quality);
             }
         }
         if (hasCaption) {

@@ -3187,6 +3187,21 @@
     <string name="ForkSttNotDownloaded">Download the voice message first, then try again.</string>
     <string name="ForkSttTtlBlocked">Self-destructing voice messages cannot be transcribed.</string>
     <string name="ForkSttFailed">Transcription failed</string>
+    <!-- TG fork: media compression presets (Feature 4) -->
+    <string name="ForkCompressSettings">Media Compression (fork)</string>
+    <string name="ForkCompressSettingsInfo">Photo and video quality presets when sending</string>
+    <string name="ForkCompressOff">Off</string>
+    <string name="ForkCompressEnabled">Enable media compression (fork)</string>
+    <string name="ForkCompressInfo">Choose how photos and videos are compressed before sending. The presets only change the quality Telegram already offers: they never bypass size limits, and sending as a file stays untouched.</string>
+    <string name="ForkCompressPhotoHeader">Photo preset</string>
+    <string name="ForkCompressVideoHeader">Video preset</string>
+    <string name="ForkCompressPresetOriginal">Original</string>
+    <string name="ForkCompressPresetMedium">Medium</string>
+    <string name="ForkCompressPresetSmall">Small</string>
+    <string name="ForkCompressRowTitle">Photo compression (fork)</string>
+    <string name="ForkCompressRow">Photo compression (fork): %s</string>
+    <string name="ForkCompressOriginalSize">Total original size: %s</string>
+    <string name="ForkCompressVideoInfo">The photo preset applies in the attach sheet. The video preset preselects the quality step when a video is opened in the editor; videos sent without opening the editor are sent unchanged.</string>
     <string name="FilterRemoveFrom">Remove from folder</string>
     <string name="FilterChoose">Choose a folder</string>
     <string name="FilterUserAddedToExisting">**%1$s** added to **%2$s**</string>

@@ -741,6 +741,26 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    // TG fork: subtitle of the media compression settings row (Feature 4):
+    // the current photo and video preset names
+    private String forkCompressSubtitle() {
+        if (!SharedConfig.forkCompressEnabled) {
+            return getString(R.string.ForkCompressOff);
+        }
+        return getString(forkCompressPresetString(SharedConfig.forkCompressPhotoPreset)) + " · " + getString(forkCompressPresetString(SharedConfig.forkCompressVideoPreset));
+    }
+
+    private static int forkCompressPresetString(int preset) {
+        switch (preset) {
+            case SharedConfig.FORK_COMPRESS_PRESET_MEDIUM:
+                return R.string.ForkCompressPresetMedium;
+            case SharedConfig.FORK_COMPRESS_PRESET_SMALL:
+                return R.string.ForkCompressPresetSmall;
+            default:
+                return R.string.ForkCompressPresetOriginal;
+        }
+    }
+
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (searchItem.isSearchFieldVisible2()) {
             items.add(UItem.asSpace(ActionBar.getCurrentActionBarHeight()));
@@ -837,6 +857,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(29, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.ForkTranslationEngine), forkTranslateEngineSubtitle()));
         // TG fork: fork voice-to-text engine settings (Feature 3)
         items.add(SettingCell.Factory.of(30, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_sounds, getString(R.string.ForkSttSettings), forkSttSubtitle()));
+        // TG fork: fork media compression preset settings (Feature 4)
+        items.add(SettingCell.Factory.of(31, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_data, getString(R.string.ForkCompressSettings), forkCompressSubtitle()));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -988,6 +1010,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             // TG fork: fork voice-to-text engine settings screen
             case 30:
                 presentSettingFragment(new ForkSttSettingsActivity());
+                break;
+            // TG fork: fork media compression preset settings screen
+            case 31:
+                presentSettingFragment(new ForkCompressSettingsActivity());
                 break;
 
             case 11:

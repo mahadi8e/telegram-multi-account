@@ -231,6 +231,31 @@ public class SharedConfig {
                 .apply();
     }
 
+    // TG fork: setters for the media compression presets (Feature 4)
+    public static void setForkCompressEnabled(boolean value) {
+        forkCompressEnabled = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkCompressEnabled", value)
+                .apply();
+    }
+
+    public static void setForkCompressPhotoPreset(int value) {
+        forkCompressPhotoPreset = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkCompressPhotoPreset", value)
+                .apply();
+    }
+
+    public static void setForkCompressVideoPreset(int value) {
+        forkCompressVideoPreset = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkCompressVideoPreset", value)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -386,6 +411,18 @@ public class SharedConfig {
     public static String forkSttOpenAiKey = "";
     public static String forkSttGoogleKey = "";
     public static boolean forkSttCloudConsent = false;
+    // TG fork: media compression presets (Feature 4). The presets only steer
+    // the fork's own attach-sheet row, the per-send carrier on
+    // SendingMediaInfo and the video editor's initial step; Telegram's stock
+    // quality paths, the send-as-file flow and the file-size limits are
+    // untouched. Defaults (enabled, Original) defer to the stock quality
+    // behaviour until the user picks another preset.
+    public static final int FORK_COMPRESS_PRESET_ORIGINAL = 0;
+    public static final int FORK_COMPRESS_PRESET_MEDIUM = 1;
+    public static final int FORK_COMPRESS_PRESET_SMALL = 2;
+    public static boolean forkCompressEnabled = true;
+    public static int forkCompressPhotoPreset = FORK_COMPRESS_PRESET_ORIGINAL;
+    public static int forkCompressVideoPreset = FORK_COMPRESS_PRESET_ORIGINAL;
 
     public static boolean isForkTranslateEngineSelected() {
         return forkTranslateEnabled && forkTranslateEngine != FORK_TRANSLATE_ENGINE_TELEGRAM;
@@ -823,6 +860,10 @@ public class SharedConfig {
             forkSttOpenAiKey = preferences.getString("forkSttOpenAiKey", "");
             forkSttGoogleKey = preferences.getString("forkSttGoogleKey", "");
             forkSttCloudConsent = preferences.getBoolean("forkSttCloudConsent", false);
+            // TG fork: media compression presets (Feature 4); on + Original by default
+            forkCompressEnabled = preferences.getBoolean("forkCompressEnabled", true);
+            forkCompressPhotoPreset = preferences.getInt("forkCompressPhotoPreset", FORK_COMPRESS_PRESET_ORIGINAL);
+            forkCompressVideoPreset = preferences.getInt("forkCompressVideoPreset", FORK_COMPRESS_PRESET_ORIGINAL);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);

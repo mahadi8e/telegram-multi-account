@@ -655,6 +655,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         public TLRPC.VideoSize emojiMarkup;
         public long stars;
         public boolean highQuality;
+        // TG fork: photo compression preset for this send (Feature 4);
+        // -1 = unset (stock behaviour), 0 = Original, 1 = Medium, 2 = Small
+        public int forkPhotoPreset = -1;
         public MediaController.PhotoEntry originalPhotoEntry;
         public long livePhotoVideoOffset;
         public long livePhotoTimestampUs;
@@ -9437,6 +9440,57 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
     }
 
+    // TG fork (Feature 4): explicit-size photo encode used by the Small
+    // compression preset. Mirrors the standard tier's shape (90px thumb plus
+    // one JPEG size) with a caller-provided max dimension and quality. The
+    // stock overloads above are unchanged for all their other callers.
+    public TLRPC.TL_photo generatePhotoSizes(TLRPC.TL_photo photo, String path, Uri imageUri, int maxSize, int quality) {
+        Bitmap bitmap = ImageLoader.loadBitmap(path, imageUri, maxSize, maxSize, true);
+        if (bitmap == null) {
+            bitmap = ImageLoader.loadBitmap(path, imageUri, 800, 800, true);
+        }
+        ArrayList<TLRPC.PhotoSize> sizes = new ArrayList<>();
+        TLRPC.PhotoSize size = ImageLoader.scaleAndSaveImage(bitmap, 90, 90, 55, true);
+        if (size != null) {
+            sizes.add(size);
+        }
+        size = ImageLoader.scaleAndSaveImage(bitmap, maxSize, maxSize, true, quality, false, 101, 101);
+        if (size != null) {
+            sizes.add(size);
+        }
+        if (bitmap != null) {
+            bitmap.recycle();
+        }
+        if (sizes.isEmpty()) {
+            return null;
+        } else {
+            getUserConfig().saveConfig(false);
+            if (photo == null) {
+                photo = new TLRPC.TL_photo();
+            }
+            photo.date = getConnectionsManager().getCurrentTime();
+            photo.sizes = sizes;
+            photo.file_reference = new byte[0];
+            return photo;
+        }
+    }
+
+    // TG fork (Feature 4): picks the photo encode for a send. When a fork
+    // compression preset is in effect, Medium forces the stock standard tier
+    // and Small uses the explicit-size overload (800px, JPEG quality 70);
+    // Original — like no preset at all — keeps the caller's stock quality
+    // choice untouched, so default behaviour is identical to stock.
+    public TLRPC.TL_photo generatePhotoSizesForPreset(String path, Uri imageUri, boolean highQuality, int forkPhotoPreset) {
+        if (SharedConfig.forkCompressEnabled && forkPhotoPreset >= 0) {
+            if (forkPhotoPreset == SharedConfig.FORK_COMPRESS_PRESET_MEDIUM) {
+                return generatePhotoSizes(null, path, imageUri, false);
+            } else if (forkPhotoPreset == SharedConfig.FORK_COMPRESS_PRESET_SMALL) {
+                return generatePhotoSizes(null, path, imageUri, 800, 70);
+            }
+        }
+        return generatePhotoSizes(null, path, imageUri, highQuality);
+    }
+
     private final static int ERROR_TYPE_UNSUPPORTED = 1;
     private final static int ERROR_TYPE_FILE_TOO_LARGE = 2;
 
@@ -11036,7 +11090,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         } else {
                             worker.sync = new CountDownLatch(1);
                             mediaSendThreadPool.execute(() -> {
-                                worker.photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(null, info.path, info.uri, info.highQuality);
+                                worker.photo = accountInstance.getSendMessagesHelper().generatePhotoSizesForPreset(info.path, info.uri, info.highQuality, info.forkPhotoPreset);
                                 if (isEncrypted && info.canDeleteAfter) {
                                     new File(info.path).delete();
                                 }
@@ -11678,7 +11732,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     ensureMediaThumbExists(accountInstance, isEncrypted, photo, info.path, info.uri, 0);
                                 }
                                 if (photo == null) {
-                                    photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(info.path, info.uri);
+                                    // TG fork: the stock fallback ignores the quality flag; the fork preset (and only it) is honoured here (Feature 4)
+                                    photo = accountInstance.getSendMessagesHelper().generatePhotoSizesForPreset(info.path, info.uri, false, info.forkPhotoPreset);
                                     if (isEncrypted && info.canDeleteAfter) {
                                         new File(info.path).delete();
                                     }

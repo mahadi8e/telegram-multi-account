@@ -7632,6 +7632,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                     MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) object;
                     if (!photoEntry.isVideo || photoEntry.isLivePhoto()) {
                         photoEntry.highQuality = !photoEntry.isHighQuality();
+                        // TG fork: keep the compression preset in sync (Feature 4)
+                        photoEntry.forkPhotoPreset = photoEntry.isHighQuality() ? SharedConfig.FORK_COMPRESS_PRESET_ORIGINAL : SharedConfig.FORK_COMPRESS_PRESET_MEDIUM;
                         compressItem.setPhotoState(photoEntry.isHighQuality());
                         showPhotoQualityHint(photoEntry.isHighQuality());
 
@@ -21738,6 +21740,22 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             return compressionsCount - 1;
         }
         SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+        // TG fork: media compression presets (Feature 4) — when the user has
+        // never chosen a step for any of the step counts the stock code would
+        // consult, the fork default video preset picks the initial step
+        // instead of the bitrate heuristic. A remembered choice always wins.
+        if (SharedConfig.forkCompressEnabled && this.compressionsCount >= 1) {
+            boolean hasRememberedCompression = false;
+            for (int count = this.compressionsCount; count < 5; count++) {
+                if (preferences.getInt(String.format(Locale.US, "compress_video_%d", count), -1) >= 0) {
+                    hasRememberedCompression = true;
+                    break;
+                }
+            }
+            if (!hasRememberedCompression) {
+                return forkVideoPresetStep(this.compressionsCount);
+            }
+        }
         int compressionsCount = this.compressionsCount;
         int maxCompression = 2;
         while (compressionsCount < 5) {
@@ -21748,6 +21766,24 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             compressionsCount++;
         }
         return Math.min(maxCompression, Math.round(DownloadController.getInstance(currentAccount).getMaxVideoBitrate() / (100f / compressionsCount)) - 1);
+    }
+
+    // TG fork: maps the fork video preset onto the editor's step indices
+    // (Feature 4): Original = top step, Medium = one step below the top (the
+    // 1280 step when four steps exist, the 854 step when three exist),
+    // Small = the lowest step.
+    private int forkVideoPresetStep(int count) {
+        if (count <= 1) {
+            return 0;
+        }
+        switch (SharedConfig.forkCompressVideoPreset) {
+            case SharedConfig.FORK_COMPRESS_PRESET_ORIGINAL:
+                return count - 1;
+            case SharedConfig.FORK_COMPRESS_PRESET_MEDIUM:
+                return Math.max(0, count - 2);
+            default:
+                return 0;
+        }
     }
 
     private void updateCompressionsCount(int h, int w) {

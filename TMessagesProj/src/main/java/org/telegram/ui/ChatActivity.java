@@ -13340,6 +13340,11 @@ public class ChatActivity extends BaseFragment implements
                                     info.hasMediaSpoilers = photoEntry.hasSpoiler;
                                     info.stars = photoEntry.starsAmount;
                                     info.highQuality = !isStickerMode && photoEntry.isHighQuality();
+                                    // TG fork: media compression presets (Feature 4)
+                                    info.forkPhotoPreset = SharedConfig.forkCompressEnabled && !isStickerMode ? photoEntry.getForkPhotoPreset() : -1;
+                                    if (info.forkPhotoPreset > 0) {
+                                        info.highQuality = false;
+                                    }
                                     photos.add(info);
                                     photoEntry.reset();
                                 }
@@ -20784,6 +20789,13 @@ public class ChatActivity extends BaseFragment implements
                 info.videoEditedInfo = entry.editedInfo;
                 info.canDeleteAfter = entry.canDeleteAfter;
                 info.highQuality = entry.isHighQuality();
+                // TG fork: media compression presets (Feature 4); Medium/Small
+                // also pin the stock quality flag so the sent-media dedupe
+                // typing matches the encode that will actually happen
+                info.forkPhotoPreset = SharedConfig.forkCompressEnabled ? entry.getForkPhotoPreset() : -1;
+                if (info.forkPhotoPreset > 0) {
+                    info.highQuality = false;
+                }
                 photos.add(info);
                 entry.reset();
             }
