@@ -746,6 +746,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         return getString(SharedConfig.forkDeletedMessagesEnabled ? R.string.ForkDeletedMessagesOn : R.string.ForkDeletedMessagesOff);
     }
 
+    // TG fork: subtitle of the download tuning settings row (Feature 6)
+    private String forkDownloadSubtitle() {
+        return getString(SharedConfig.forkDownloadLogEnabled ? R.string.ForkDownloadLogOn : R.string.ForkDownloadLogOff);
+    }
+
     // TG fork: subtitle of the media compression settings row (Feature 4):
     // the current photo and video preset names
     private String forkCompressSubtitle() {
@@ -866,6 +871,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(31, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_data, getString(R.string.ForkCompressSettings), forkCompressSubtitle()));
         // TG fork: fork deleted-message vault settings (Feature 5)
         items.add(SettingCell.Factory.of(32, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_privacy, getString(R.string.ForkDeletedMessagesSettings), forkDeletedMessagesSubtitle()));
+        // TG fork: fork download tuning settings (Feature 6)
+        items.add(SettingCell.Factory.of(33, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_data, getString(R.string.ForkDownloadSettings), forkDownloadSubtitle()));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -1025,6 +1032,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             // TG fork: fork deleted-message vault settings screen
             case 32:
                 presentSettingFragment(new ForkDeletedMessagesSettingsActivity());
+                break;
+            // TG fork: fork download tuning settings screen
+            case 33:
+                presentSettingFragment(new ForkDownloadSettingsActivity());
                 break;
 
             case 11:

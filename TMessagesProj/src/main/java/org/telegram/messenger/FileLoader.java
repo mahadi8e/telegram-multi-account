@@ -1002,6 +1002,8 @@ public class FileLoader extends BaseController {
 
             @Override
             public void didFinishLoadingFile(FileLoadOperation operation, File finalFile) {
+                // TG fork: record the finished download in the local speed log (Feature 6)
+                DownloadLogStorage.record(currentAccount, operation, document != null ? getDocumentFileName(document) : null, true, 0);
                 if (!operation.isPreloadVideoOperation() && operation.isPreloadFinished()) {
                     checkDownloadQueue(operation, operation.getQueue(), 0);
                     return;
@@ -1029,6 +1031,8 @@ public class FileLoader extends BaseController {
 
             @Override
             public void didFailedLoadingFile(FileLoadOperation operation, int reason) {
+                // TG fork: record the failed download in the local speed log (Feature 6)
+                DownloadLogStorage.record(currentAccount, operation, document != null ? getDocumentFileName(document) : null, false, reason);
                 loadOperationPathsUI.remove(fileName);
                 checkDownloadQueue(operation, operation.getQueue());
                 if (delegate != null) {

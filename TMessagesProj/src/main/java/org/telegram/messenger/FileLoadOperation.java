@@ -62,6 +62,12 @@ public class FileLoadOperation {
     private boolean isVideoDocument;
 
     public volatile boolean caughtPremiumFloodWait;
+    // TG fork (Feature 6): repeated FLOOD_PREMIUM_WAIT escalation state.
+    // Strikes are counted in startDownloadRequest while the server is
+    // evidently still throttling this operation; see the marked block there.
+    private int forkFloodWaitStrikes;
+    private long forkFloodNextStrikeAt;
+    private long forkFloodBackoffUntil;
     public void setStream(FileLoadOperationStream stream, boolean streamPriority, long streamOffset) {
 //        FileLog.e("FileLoadOperation " + getFileName() + " setStream(" + stream + ")");
         this.stream = stream;
@@ -794,6 +800,12 @@ public class FileLoadOperation {
         return fileName;
     }
 
+    // TG fork (Feature 6): the last start() timestamp; read by the download
+    // speed log (DownloadLogStorage) when this operation finishes or fails
+    public long getStartTime() {
+        return startTime;
+    }
+
     public long getDocumentId() {
         return documentId;
     }
@@ -870,6 +882,10 @@ public class FileLoadOperation {
 
     public boolean start(final FileLoadOperationStream stream, final long streamOffset, final boolean streamPriority) {
         startTime = System.currentTimeMillis();
+        // TG fork (Feature 6): a (re)start begins a new flood-wait episode
+        forkFloodWaitStrikes = 0;
+        forkFloodNextStrikeAt = 0;
+        forkFloodBackoffUntil = 0;
         updateParams();
         if (currentDownloadChunkSize == 0) {
             if (forceSmallChunk) {
@@ -1590,6 +1606,10 @@ public class FileLoadOperation {
         if (state != stateDownloading && state != stateCancelling) {
             return;
         }
+        // TG fork (Feature 6): the flood-wait episode ends with the operation
+        forkFloodWaitStrikes = 0;
+        forkFloodNextStrikeAt = 0;
+        forkFloodBackoffUntil = 0;
         state = stateFinished;
         notifyStreamListeners();
         cleanup();
@@ -2316,6 +2336,48 @@ public class FileLoadOperation {
             if (streamPriorityStartOffset == 0 && !nextPartWasPreloaded && (!isPreloadVideoOperation || moovFound != 0) && totalBytesCount > 0) {
                 count = Math.max(0, currentMaxDownloadRequests - requestInfos.size() -
                         (useDownloadByteBudget ? delayedRequestInfos.size() : 0));
+            }
+        }
+
+        // TG fork (Feature 6): repeated FLOOD_PREMIUM_WAIT escalation. Native
+        // tgnet already enforces the exact server wait for every throttled
+        // request and never reports a 420 (or the wait value) to Java — the
+        // only signals available here are caughtPremiumFloodWait and the age
+        // of in-flight requests: a request the server is holding stays
+        // outstanding far longer than a normal chunk round trip. While such
+        // fresh evidence of throttling exists, count one strike per backoff
+        // window and, from the third strike on, defer new part dispatches by
+        // min(2000 ms * 2^(strikes-2), 300 s) — 2000 ms being the minimum
+        // wait native tgnet clamps any FLOOD_WAIT to, since the real server
+        // wait is not exposed to Java — through the existing paced-request
+        // timer. This only ever waits LONGER than stock; it never raises any
+        // request rate, part size, queue cap or connection limit.
+        if (caughtPremiumFloodWait) {
+            long now = System.currentTimeMillis();
+            if (forkFloodBackoffUntil > now) {
+                Utilities.stageQueue.postRunnable(pacedDownloadRequest, forkFloodBackoffUntil - now);
+                return;
+            }
+            if (now >= forkFloodNextStrikeAt) {
+                boolean heldRequest = false;
+                for (int i = 0; i < requestInfos.size(); i++) {
+                    if (now - requestInfos.get(i).requestStartTime >= 2000) {
+                        heldRequest = true;
+                        break;
+                    }
+                }
+                if (heldRequest) {
+                    forkFloodWaitStrikes++;
+                    long extraDelay = forkFloodWaitStrikes > 2
+                            ? Math.min(2000L << Math.min(forkFloodWaitStrikes - 2, 8), 300_000L)
+                            : 2000L;
+                    forkFloodNextStrikeAt = now + extraDelay;
+                    if (forkFloodWaitStrikes > 2) {
+                        forkFloodBackoffUntil = now + extraDelay;
+                        Utilities.stageQueue.postRunnable(pacedDownloadRequest, extraDelay);
+                        return;
+                    }
+                }
             }
         }
 

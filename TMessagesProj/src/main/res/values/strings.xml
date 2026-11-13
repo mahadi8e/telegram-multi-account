@@ -3226,6 +3226,25 @@
     <string name="ForkDeletedMessagesNotDownloaded">Media was not downloaded before deletion</string>
     <string name="ForkDeletedMessagesEmpty">No retained messages for this chat yet.</string>
     <string name="ForkDeletedMessagesDeleteOne">Delete this retained copy?</string>
+
+    <string name="ForkDownloadSettings">Download Tuning (fork)</string>
+    <string name="ForkDownloadSettingsInfo">Per-file download speed log</string>
+    <string name="ForkDownloadLogOn">Speed log on</string>
+    <string name="ForkDownloadLogOff">Speed log off</string>
+    <string name="ForkDownloadLogEnabled">Record download speed log</string>
+    <string name="ForkDownloadLogInfo">Each finished or failed download is recorded on this device only: file name, size, time taken and average speed. Nothing is sent anywhere. The time measures the active download phase, so a file that was paused or resumed may look faster than it really was.</string>
+    <string name="ForkDownloadLogHeader">Download log</string>
+    <string name="ForkDownloadLogEmpty">No downloads recorded yet.</string>
+    <string name="ForkDownloadLogSummary">Average over %1$d finished downloads: %2$s</string>
+    <string name="ForkDownloadStatusFailed">Failed</string>
+    <string name="ForkDownloadStatusCancelled">Cancelled</string>
+    <string name="ForkDownloadClearLog">Clear download log</string>
+    <string name="ForkDownloadClearLogConfirm">Delete all recorded download log entries from this device?</string>
+    <string name="ForkDownloadStockHeader">Already in Telegram</string>
+    <string name="ForkDownloadAutoDownloadRow">Auto-download &amp; Wi-Fi prefetch</string>
+    <string name="ForkDownloadAutoDownloadInfo">Telegram already downloads media ahead of time on Wi-Fi. The row above opens the stock auto-download settings; the fork changes nothing there.</string>
+    <string name="ForkDownloadQueueInfo">Downloads are already queued per chat and data center, can be paused and resumed, and even continue after the app restarts. See and manage them in Search → Downloads.</string>
+    <string name="ForkDownloadBackoffInfo">If the server repeatedly throttles one large download (FLOOD_WAIT), this client waits progressively longer before dispatching more of it, on top of the server\'s own wait. It never downloads faster than Telegram allows.</string>
     <string name="FilterRemoveFrom">Remove from folder</string>
     <string name="FilterChoose">Choose a folder</string>
     <string name="FilterUserAddedToExisting">**%1$s** added to **%2$s**</string>

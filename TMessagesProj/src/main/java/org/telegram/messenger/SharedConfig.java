@@ -283,6 +283,15 @@ public class SharedConfig {
                 .apply();
     }
 
+    // TG fork: setter for the download speed log switch (Feature 6)
+    public static void setForkDownloadLogEnabled(boolean value) {
+        forkDownloadLogEnabled = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("forkDownloadLogEnabled", value)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -461,6 +470,13 @@ public class SharedConfig {
     public static boolean forkDeletedMessagesEnabled = false;
     public static int forkDeletedMessagesCapMb = 200;
     public static boolean forkDeletedMessagesConsent = false;
+    // TG fork: download speed log (Feature 6). When on, every finished or
+    // failed download is recorded in a private per-account database on this
+    // device only (file name, size, duration, average speed), so download
+    // behaviour can be measured instead of guessed. Purely observational:
+    // it changes no request behaviour and nothing ever leaves the device.
+    // Defaults to ON.
+    public static boolean forkDownloadLogEnabled = true;
 
     public static boolean isForkTranslateEngineSelected() {
         return forkTranslateEnabled && forkTranslateEngine != FORK_TRANSLATE_ENGINE_TELEGRAM;
@@ -906,6 +922,8 @@ public class SharedConfig {
             forkDeletedMessagesEnabled = preferences.getBoolean("forkDeletedMessagesEnabled", false);
             forkDeletedMessagesCapMb = preferences.getInt("forkDeletedMessagesCapMb", 200);
             forkDeletedMessagesConsent = preferences.getBoolean("forkDeletedMessagesConsent", false);
+            // TG fork: download speed log switch (Feature 6); on by default
+            forkDownloadLogEnabled = preferences.getBoolean("forkDownloadLogEnabled", true);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);
