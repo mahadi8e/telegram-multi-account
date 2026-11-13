@@ -276,6 +276,16 @@ public class ConnectionsManager extends BaseController {
         if (BuildVars.LOGS_ENABLED) {
             android.util.Log.d("TGSLOT", "init slot=" + instance);
         }
+        // TG fork: an instance created for an account that is not the selected
+        // (live) one must not run its connection. Some UI paths incidentally
+        // create a dormant account's controllers, and in stock nothing pauses
+        // the fresh instance, so it would connect and notify in the background.
+        // Pause it immediately; the stock flows resume the account when it
+        // becomes live (the switch flow selects it before creating it, and
+        // LoginActivity resumes a login slot in onResume).
+        if (instance != UserConfig.selectedAccount) {
+            setAppPaused(true, false);
+        }
     }
 
     private String getRegId() {

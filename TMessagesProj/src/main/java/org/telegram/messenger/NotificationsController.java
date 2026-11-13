@@ -1087,6 +1087,16 @@ public class NotificationsController extends BaseController implements Notificat
             FileLog.d("NotificationsController: processNewMessages msgs.size()=" + (messageObjects == null ? "null" : messageObjects.size()) + " isLast=" + isLast + " isFcm=" + isFcm + ")");
         }
 
+        // TG fork: a dormant (not selected) account must never post notifications,
+        // even if its controllers were incidentally created and it synced in the
+        // background. Only the live account notifies.
+        if (!UserConfig.isLiveAccount(currentAccount)) {
+            if (countDownLatch != null) {
+                countDownLatch.countDown();
+            }
+            return;
+        }
+
         // TG fork: when this account was dormant and has just been switched to, the
         // messages it missed are a backlog sync, not new arrivals. They are fetched
         // and shown in the chat list, but they must not flood the user with one
