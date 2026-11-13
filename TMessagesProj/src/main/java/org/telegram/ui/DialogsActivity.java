@@ -116,6 +116,8 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.LocalFolder;
+import org.telegram.messenger.LocalFoldersController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -524,6 +526,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private int undoViewIndex;
     private UndoView[] undoView = new UndoView[2];
     private FilterTabsView filterTabsView;
+    // TG fork: local folder shown on a filter page slot (mirrors
+    // MessagesController.selectedDialogFilter slots for dialogsType 7 / 8)
+    private final LocalFolder[] selectedLocalFolder = new LocalFolder[2];
     private boolean askingForPermissions;
     private int searchViewPagerIndex;
     @Nullable
@@ -583,6 +588,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuSubItem pin2Item;
     @Nullable
     private ActionBarMenuSubItem addToFolderItem;
+    // TG fork: action-mode sub items for device-only local folders/pins
+    private ActionBarMenuSubItem addToLocalFolderItem;
+    private ActionBarMenuSubItem localPinItem;
     @Nullable
     private ActionBarMenuSubItem removeFromFolderItem;
     @Nullable
@@ -714,6 +722,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final static int add_to_folder = 109;
     private final static int remove_from_folder = 110;
     private final static int community_ungroup = 111;
+    // TG fork: action-mode ids for the local folder rows
+    private final static int add_to_local_folder = 112;
+    private final static int local_pin = 113;
 
     private final static int ARCHIVE_ITEM_STATE_PINNED = 0;
     private final static int ARCHIVE_ITEM_STATE_SHOWED = 1;
@@ -2819,6 +2830,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             observersGroup
                 .add(NotificationCenter.dialogsNeedReload)
                 .add(NotificationCenter.dialogFiltersUpdated)
+                // TG fork: rebuild tabs/pages when local folders or pins change
+                .add(NotificationCenter.localFoldersUpdated)
                 .add(NotificationCenter.updateInterfaces)
                 .add(NotificationCenter.encryptedChatUpdated)
                 .add(NotificationCenter.contactsDidLoad)
@@ -3546,6 +3559,17 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         return;
                     }
 
+                    // TG fork: local folder tabs use a separate negative id
+                    // namespace; they bypass the positional server-filter check.
+                    if (!tab.isDefault && LocalFoldersController.isLocalTabId(tab.id)) {
+                        viewPages[1].selectedType = tab.id;
+                        viewPages[1].setVisibility(View.VISIBLE);
+                        viewPages[1].setTranslationX(viewPages[0].getMeasuredWidth());
+                        showScrollbars(false);
+                        switchToCurrentSelectedMode(true);
+                        animatingForward = forward;
+                        return;
+                    }
                     ArrayList<MessagesController.DialogFilter> dialogFilters = getMessagesController().getDialogFilters();
                     if (!tab.isDefault && (tab.id < 0 || tab.id >= dialogFilters.size())) {
                         return;
@@ -3597,6 +3621,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     if (tabId == filterTabsView.getDefaultTabId()) {
                         return getMessagesStorage().getMainUnreadCount();
                     }
+                    // TG fork: local folder tab counters come from the local controller
+                    if (LocalFoldersController.isLocalTabId(tabId)) {
+                        return LocalFoldersController.getInstance(currentAccount).getFolderUnreadCount(tabId);
+                    }
                     ArrayList<MessagesController.DialogFilter> dialogFilters = getMessagesController().getDialogFilters();
                     if (tabId < 0 || tabId >= dialogFilters.size()) {
                         return 0;
@@ -3616,6 +3644,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         filterOptions.dismiss();
                         filterOptions = null;
                         return false;
+                    }
+
+                    // TG fork: long-pressing a local folder tab opens its edit screen
+                    if (LocalFoldersController.isLocalTabId(tabView.getId())) {
+                        LocalFolder localFolder = LocalFoldersController.getInstance(currentAccount).getFolderByTabId(tabView.getId());
+                        if (localFolder != null) {
+                            presentFragment(new LocalFilterCreateActivity(localFolder.id, 0));
+                        }
+                        return true;
                     }
 
                     final MessagesController.DialogFilter dialogFilter;
@@ -3762,6 +3799,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
                 @Override
                 public void onDeletePressed(int id) {
+                    // TG fork: deleting a local folder tab deletes the local
+                    // folder (the positional server lookup would crash on
+                    // negative ids); the server path below is untouched.
+                    if (LocalFoldersController.isLocalTabId(id)) {
+                        LocalFolder localFolder = LocalFoldersController.getInstance(currentAccount).getFolderByTabId(id);
+                        if (localFolder != null) {
+                            showLocalFolderDeleteAlert(localFolder);
+                        }
+                        return;
+                    }
                     showDeleteAlert(getMessagesController().getDialogFilters().get(id));
                 }
             });
@@ -3931,6 +3978,25 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         undoView.showWithAction(did, UndoView.ACTION_REMOVED_FROM_FOLDER, neverShow.size(), filter, null, null);
                     }
                     hideActionMode(false);
+                } else if (id == add_to_local_folder) {
+                    // TG fork: "Add to local folder" for the selected dialogs —
+                    // opens the local folder picker; nothing touches the server
+                    showLocalFolderPicker(new ArrayList<>(selectedDialogs));
+                    hideActionMode(true);
+                } else if (id == local_pin) {
+                    // TG fork: toggle the device-only local pin for all selected dialogs
+                    LocalFoldersController localController = LocalFoldersController.getInstance(currentAccount);
+                    boolean allLocallyPinned = !selectedDialogs.isEmpty();
+                    for (int i = 0; i < selectedDialogs.size(); i++) {
+                        if (!localController.isPinnedLocally(selectedDialogs.get(i))) {
+                            allLocallyPinned = false;
+                            break;
+                        }
+                    }
+                    for (int i = 0; i < selectedDialogs.size(); i++) {
+                        localController.setDialogPinnedLocally(selectedDialogs.get(i), !allLocallyPinned);
+                    }
+                    hideActionMode(true);
                 } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == archive2 || id == pin2) {
                     performSelectedDialogsAction(selectedDialogs, id, true, false);
                 }
@@ -6668,6 +6734,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         archiveItem = otherItem.addSubItem(archive, R.drawable.msg_archive, LocaleController.getString(R.string.Archive));
         pin2Item = otherItem.addSubItem(pin2, R.drawable.msg_pin, LocaleController.getString(R.string.DialogPin));
         addToFolderItem = otherItem.addSubItem(add_to_folder, R.drawable.msg_addfolder, LocaleController.getString(R.string.FilterAddTo));
+        // TG fork: local folder rows are created only while the feature is enabled
+        if (SharedConfig.localFoldersEnabled) {
+            addToLocalFolderItem = otherItem.addSubItem(add_to_local_folder, R.drawable.msg_folders, LocaleController.getString(R.string.AddToLocalFolder));
+            localPinItem = otherItem.addSubItem(local_pin, R.drawable.msg_pin, LocaleController.getString(R.string.PinLocally));
+        }
         removeFromFolderItem = otherItem.addSubItem(remove_from_folder, R.drawable.msg_removefolder, LocaleController.getString(R.string.FilterRemoveFrom));
         readItem = otherItem.addSubItem(read, R.drawable.msg_markread, LocaleController.getString(R.string.MarkAsRead));
         clearItem = otherItem.addSubItem(clear, R.drawable.msg_clear, LocaleController.getString(R.string.ClearHistory));
@@ -6727,6 +6798,31 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPages[a].listView.stopScroll();
         }
         int a = animated && viewPages.length > 1 ? 1 : 0;
+        // TG fork: a selected local folder tab (negative id namespace) drives
+        // this page through the folder-page machinery without any
+        // MessagesController.DialogFilter — branch before the positional check.
+        if (LocalFoldersController.isLocalTabId(viewPages[a].selectedType)) {
+            LocalFolder localFolder = LocalFoldersController.getInstance(currentAccount).getFolderByTabId(viewPages[a].selectedType);
+            if (localFolder == null) {
+                return;
+            }
+            if (viewPages[a == 0 ? 1 : 0].dialogsType == 7) {
+                viewPages[a].dialogsType = 8;
+            } else {
+                viewPages[a].dialogsType = 7;
+            }
+            viewPages[a].listView.setScrollEnabled(true);
+            int localSlot = viewPages[a].dialogsType == 8 ? 1 : 0;
+            selectedLocalFolder[localSlot] = localFolder;
+            getMessagesController().selectedDialogFilter[localSlot] = null;
+            if (viewPages.length > 1) {
+                viewPages[1].isLocked = false;
+            }
+            viewPages[a].dialogsAdapter.setDialogsType(viewPages[a].dialogsType);
+            viewPages[a].layoutManager.scrollToPositionWithOffset(0, (int) scrollYOffset);
+            checkListLoad(viewPages[a]);
+            return;
+        }
         if (viewPages[a].selectedType < 0 || viewPages[a].selectedType >= getMessagesController().getDialogFilters().size()) {
             return;
         }
@@ -6742,6 +6838,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             viewPages[a].listView.setScrollEnabled(true);
             getMessagesController().selectDialogFilter(filter, viewPages[a].dialogsType == 8 ? 1 : 0);
+            // TG fork: this page shows a server filter, not a local folder
+            selectedLocalFolder[viewPages[a].dialogsType == 8 ? 1 : 0] = null;
         }
 
         if (viewPages.length > 1) {
@@ -6751,6 +6849,87 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         viewPages[a].dialogsAdapter.setDialogsType(viewPages[a].dialogsType);
         viewPages[a].layoutManager.scrollToPositionWithOffset(viewPages[a].dialogsType == DIALOGS_TYPE_DEFAULT && hasHiddenArchive() && viewPages[a].archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN ? 1 : 0, (int) scrollYOffset);
         checkListLoad(viewPages[a]);
+    }
+
+    // TG fork: confirm dialog for deleting a device-only local folder
+    private void showLocalFolderDeleteAlert(LocalFolder folder) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(LocaleController.getString(R.string.LocalFolderDelete));
+        builder.setMessage(LocaleController.getString(R.string.LocalFolderDeleteAlert));
+        builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialogInterface, i) -> {
+            LocalFoldersController.getInstance(currentAccount).deleteFolder(folder.id);
+            if (filterTabsView != null) {
+                filterTabsView.setIsEditing(false);
+            }
+            showDoneItem(false);
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    // TG fork: bottom sheet to add one chat to a local folder
+    private void showLocalFolderPicker(long dialogId) {
+        ArrayList<Long> ids = new ArrayList<>();
+        ids.add(dialogId);
+        showLocalFolderPicker(ids);
+    }
+
+    // TG fork: bottom sheet listing the local folders; tapping one toggles the
+    // membership of every passed dialog; the last item creates a new folder.
+    // Purely local — no server call is made here.
+    private void showLocalFolderPicker(ArrayList<Long> dialogIds) {
+        if (getParentActivity() == null || dialogIds == null || dialogIds.isEmpty()) {
+            return;
+        }
+        LocalFoldersController controller = LocalFoldersController.getInstance(currentAccount);
+        ArrayList<LocalFolder> localFoldersList = controller.getFolders();
+        CharSequence[] items = new CharSequence[localFoldersList.size() + 1];
+        int[] icons = new int[localFoldersList.size() + 1];
+        for (int i = 0; i < localFoldersList.size(); i++) {
+            LocalFolder folder = localFoldersList.get(i);
+            boolean allIn = true;
+            for (int j = 0; j < dialogIds.size(); j++) {
+                if (!folder.dialogIds.contains(dialogIds.get(j))) {
+                    allIn = false;
+                    break;
+                }
+            }
+            items[i] = folder.name + (allIn ? " ✓" : "");
+            icons[i] = R.drawable.msg_folders;
+        }
+        items[localFoldersList.size()] = LocaleController.getString(R.string.LocalFolderNew);
+        icons[localFoldersList.size()] = R.drawable.msg_addfolder;
+        BottomSheet.Builder builder = new BottomSheet.Builder(getParentActivity());
+        builder.setTitle(LocaleController.getString(R.string.AddToLocalFolder));
+        builder.setItems(items, icons, (dialogInterface, which) -> {
+            dialogInterface.dismiss();
+            if (which == localFoldersList.size()) {
+                long singleDialogId = dialogIds.size() == 1 ? dialogIds.get(0) : 0;
+                presentFragment(new LocalFilterCreateActivity(0, singleDialogId));
+                return;
+            }
+            LocalFolder folder = localFoldersList.get(which);
+            boolean allIn = true;
+            for (int j = 0; j < dialogIds.size(); j++) {
+                if (!folder.dialogIds.contains(dialogIds.get(j))) {
+                    allIn = false;
+                    break;
+                }
+            }
+            if (allIn) {
+                for (int j = 0; j < dialogIds.size(); j++) {
+                    controller.removeDialogFromFolder(folder.id, dialogIds.get(j));
+                }
+            } else {
+                for (int j = 0; j < dialogIds.size(); j++) {
+                    controller.addDialogToFolder(folder.id, dialogIds.get(j));
+                }
+            }
+        });
+        showDialog(builder.create());
     }
 
     private boolean scrollBarVisible = true;
@@ -6780,7 +6959,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             filterOptions = null;
         }
         final ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
-        if (filters.size() > 1) {
+        // TG fork: device-only local folders become extra tabs after the server ones
+        final ArrayList<LocalFolder> localFolders = SharedConfig.localFoldersEnabled ? LocalFoldersController.getInstance(currentAccount).getFolders() : new ArrayList<>();
+        if (filters.size() > 1 || !localFolders.isEmpty()) {
             if (force || filterTabsView.getVisibility() != View.VISIBLE) {
                 boolean animatedUpdateItems = animated;
                 if (filterTabsView.getVisibility() != View.VISIBLE) {
@@ -6804,6 +6985,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         final MessagesController.DialogFilter filter = filters.get(a);
                         filterTabsView.addTab(a, filter.localId, filter.name, filter.entities, filter.title_noanimate, false, filters.get(a).locked);
                     }
+                }
+                // TG fork: append local folder tabs after the server tabs
+                // (negative id namespace, see LocalFoldersController.toTabId)
+                for (int a = 0, N = localFolders.size(); a < N; a++) {
+                    final LocalFolder folder = localFolders.get(a);
+                    int tabId = LocalFoldersController.toTabId(folder.id);
+                    filterTabsView.addTab(tabId, tabId, folder.name, false, false, false, true);
                 }
                 if (stableId >= 0) {
                     if (selectWithStableId) {
@@ -8704,6 +8892,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             previewMenu[0].addView(unpinItem);
         }
 
+        // TG fork: device-only local pin + "add to local folder" rows. They
+        // touch only LocalFoldersController — the server pin block above is
+        // untouched, and dialog.pinned is never set here.
+        if (SharedConfig.localFoldersEnabled && !isCommunityCell && dialog != null) {
+            final long localDialogId = dialogId;
+            final LocalFoldersController localController = LocalFoldersController.getInstance(currentAccount);
+            ActionBarMenuSubItem localPinItem = new ActionBarMenuSubItem(getParentActivity(), false, false);
+            if (localController.isPinnedLocally(localDialogId)) {
+                localPinItem.setTextAndIcon(LocaleController.getString(R.string.UnpinLocally), R.drawable.msg_unpin);
+            } else {
+                localPinItem.setTextAndIcon(LocaleController.getString(R.string.PinLocally), R.drawable.msg_pin);
+            }
+            localPinItem.setMinimumWidth(160);
+            localPinItem.setOnClickListener(e -> {
+                localController.setDialogPinnedLocally(localDialogId, !localController.isPinnedLocally(localDialogId));
+                finishPreviewFragment();
+            });
+            previewMenu[0].addView(localPinItem);
+
+            ActionBarMenuSubItem addToLocalFolderRow = new ActionBarMenuSubItem(getParentActivity(), false, false);
+            addToLocalFolderRow.setTextAndIcon(LocaleController.getString(R.string.AddToLocalFolder), R.drawable.msg_folders);
+            addToLocalFolderRow.setMinimumWidth(160);
+            addToLocalFolderRow.setOnClickListener(e -> {
+                finishPreviewFragment();
+                showLocalFolderPicker(localDialogId);
+            });
+            previewMenu[0].addView(addToLocalFolderRow);
+        }
+
         if (!DialogObject.isUserDialog(dialogId) || !UserObject.isUserSelf(getMessagesController().getUser(dialogId))) {
             ActionBarMenuSubItem muteItem = new ActionBarMenuSubItem(getParentActivity(), false, false);
             if (!getMessagesController().isDialogMuted(dialogId, 0)) {
@@ -9883,6 +10100,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 addToFolderItem.setVisibility(View.GONE);
             }
         }
+        // TG fork: local folder rows stay visible while the feature is on;
+        // the pin label follows whether all selected dialogs are locally pinned
+        if (addToLocalFolderItem != null) {
+            addToLocalFolderItem.setVisibility(View.VISIBLE);
+        }
+        if (localPinItem != null) {
+            LocalFoldersController localController = LocalFoldersController.getInstance(currentAccount);
+            boolean allLocallyPinned = !selectedDialogs.isEmpty();
+            for (int i = 0; i < selectedDialogs.size(); i++) {
+                if (!localController.isPinnedLocally(selectedDialogs.get(i))) {
+                    allLocallyPinned = false;
+                    break;
+                }
+            }
+            localPinItem.setTextAndIcon(allLocallyPinned ? LocaleController.getString(R.string.UnpinLocally) : LocaleController.getString(R.string.PinLocally), allLocallyPinned ? R.drawable.msg_unpin : R.drawable.msg_pin);
+            localPinItem.setVisibility(View.VISIBLE);
+        }
         if (muteItem != null) {
             if (canUnmuteCount != 0) {
                 muteItem.setIcon(R.drawable.msg_unmute);
@@ -10671,6 +10905,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
         } else if (id == NotificationCenter.dialogFiltersUpdated) {
             updateFilterTabs(true, true);
+        } else if (id == NotificationCenter.localFoldersUpdated) {
+            // TG fork: local folders/pins changed — rebuild the tab strip and
+            // refresh the visible pages (a local page list depends on them)
+            updateFilterTabs(true, true);
+            if (viewPages != null) {
+                for (int a = 0; a < viewPages.length; a++) {
+                    viewPages[a].updateList(false);
+                }
+            }
         } else if (id == NotificationCenter.filterSettingsUpdated) {
             showFiltersHint();
         } else if (id == NotificationCenter.newSuggestionsAvailable) {
@@ -10967,6 +11210,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         } else if (dialogsType == DIALOGS_TYPE_GROUPS_ONLY || dialogsType == DIALOGS_TYPE_IMPORT_HISTORY_GROUPS) {
             return messagesController.dialogsGroupsOnly;
         } else if (dialogsType == 7 || dialogsType == 8) {
+            // TG fork: a local folder page — the list is built device-side
+            // from the folder's member ids; it must never fall through to the
+            // server-filter lists below (a null server filter there means
+            // "all dialogs", which would leak non-members into the page).
+            LocalFolder localFolder = selectedLocalFolder[dialogsType == 7 ? 0 : 1];
+            if (localFolder != null) {
+                LocalFoldersController localController = LocalFoldersController.getInstance(currentAccount);
+                // the folder may have been deleted since this page was selected
+                LocalFolder freshFolder = localController.getFolder(localFolder.id);
+                if (freshFolder == null) {
+                    return new ArrayList<>();
+                }
+                return localController.buildFolderDialogs(freshFolder, messagesController.getAllDialogs());
+            }
             MessagesController.DialogFilter dialogFilter = messagesController.selectedDialogFilter[dialogsType == 7 ? 0 : 1];
             if (dialogFilter == null) {
                 return messagesController.getDialogs(folderId);

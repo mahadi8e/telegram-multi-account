@@ -124,6 +124,8 @@ public class FilterTabsView extends FrameLayout {
         public int counter;
         public boolean isDefault;
         public boolean isLocked;
+        // TG fork: true for device-only local folder tabs
+        public boolean isLocal;
         public boolean noanimate;
 
         public Tab(int i, CharSequence title, boolean noanimate) {
@@ -596,6 +598,18 @@ public class FilterTabsView extends FrameLayout {
                 }
 
             }
+
+            // TG fork: local folder tabs carry a small "Local" label in the
+            // bottom strip of the tab (where locked tabs draw their lock icon),
+            // so they can never be mistaken for server-synced folders.
+            if (currentTab.isLocal) {
+                String localLabel = LocaleController.getString(R.string.Local);
+                localMarkerPaint.setColor(textPaint.getColor());
+                localMarkerPaint.setAlpha(160);
+                localMarkerPaint.setTextSize(dp(8.5f));
+                float labelWidth = localMarkerPaint.measureText(localLabel);
+                canvas.drawText(localLabel, (getMeasuredWidth() - labelWidth) / 2f, getMeasuredHeight() - dp(2.5f), localMarkerPaint);
+            }
         }
 
         private boolean attached;
@@ -782,6 +796,8 @@ public class FilterTabsView extends FrameLayout {
 
     public final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint textCounterPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    // TG fork: paint for the small "Local" marker drawn on local folder tabs
+    private final TextPaint localMarkerPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint deletePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint counterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private ColorFilter emojiColorFilter = new PorterDuffColorFilter(0, PorterDuff.Mode.SRC_IN);
@@ -1294,6 +1310,27 @@ public class FilterTabsView extends FrameLayout {
         Tab tab = new Tab(id, text, noanimate);
         tab.isDefault = isDefault;
         tab.isLocked = isLocked;
+        allTabsWidth += tab.getWidth(true) + dp(TAB_PADDING_WIDTH);
+        tabs.add(tab);
+    }
+
+    // TG fork: addTab variant that marks the tab as a device-only local folder
+    public void addTab(int id, int stableId, CharSequence text, boolean noanimate, boolean isDefault, boolean isLocked, boolean isLocal) {
+        int position = tabs.size();
+        if (position == 0 && selectedTabId == -1) {
+            selectedTabId = id;
+        }
+        positionToId.put(position, id);
+        positionToStableId.put(position, stableId);
+        idToPosition.put(id, position);
+        if (selectedTabId != -1 && selectedTabId == id) {
+            currentPosition = position;
+        }
+
+        Tab tab = new Tab(id, text, noanimate);
+        tab.isDefault = isDefault;
+        tab.isLocked = isLocked;
+        tab.isLocal = isLocal;
         allTabsWidth += tab.getWidth(true) + dp(TAB_PADDING_WIDTH);
         tabs.add(tab);
     }
@@ -1815,6 +1852,12 @@ public class FilterTabsView extends FrameLayout {
                 return;
             }
             ArrayList<MessagesController.DialogFilter> filters = MessagesController.getInstance(UserConfig.selectedAccount).getDialogFilters();
+            // TG fork: local folder tabs sit after the server filters and are
+            // not part of this list — never drag-reorder them here (their order
+            // is managed in the local folders setup screen).
+            if (idx1 >= filters.size() || idx2 >= filters.size()) {
+                return;
+            }
             MessagesController.DialogFilter filter1 = filters.get(idx1);
             MessagesController.DialogFilter filter2 = filters.get(idx2);
             int temp = filter1.order;
@@ -1869,6 +1912,10 @@ public class FilterTabsView extends FrameLayout {
                 return;
             }
             ArrayList<MessagesController.DialogFilter> filters = MessagesController.getInstance(UserConfig.selectedAccount).getDialogFilters();
+            // TG fork: local folder tabs are not server filters; never move them here.
+            if (theIndex >= filters.size()) {
+                return;
+            }
             int temp = positionToStableId.get(theIndex),
                 temp2 = tabs.get(theIndex).id;
             for (int i = theIndex - 1; i >= 0; --i) {
@@ -1921,6 +1968,12 @@ public class FilterTabsView extends FrameLayout {
 
         @Override
         public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder source, @NonNull RecyclerView.ViewHolder target) {
+            // TG fork: local folder tabs (positions past the server filters in
+            // the strip) cannot be drag-reordered here.
+            int serverTabsCount = MessagesController.getInstance(UserConfig.selectedAccount).getDialogFilters().size();
+            if (source.getAdapterPosition() >= serverTabsCount || target.getAdapterPosition() >= serverTabsCount) {
+                return false;
+            }
             if (MessagesController.getInstance(UserConfig.selectedAccount).premiumFeaturesBlocked() && ((source.getAdapterPosition() == 0 || target.getAdapterPosition() == 0) && !UserConfig.getInstance(UserConfig.selectedAccount).isPremium())) {
                 return false;
             }

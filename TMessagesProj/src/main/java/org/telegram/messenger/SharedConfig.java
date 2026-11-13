@@ -140,6 +140,15 @@ public class SharedConfig {
         return allowPreparingHevcPlayers;
     }
 
+    public static void toggleLocalFoldersEnabled() {
+        // TG fork: persists the local folders & pins feature switch
+        localFoldersEnabled = !localFoldersEnabled;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putBoolean("localFoldersEnabled", localFoldersEnabled)
+                .apply();
+    }
+
     public static void togglePaymentByInvoice() {
         payByInvoice = !payByInvoice;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -267,6 +276,8 @@ public class SharedConfig {
     public static boolean useSurfaceInStories;
     public static boolean photoViewerBlur = true;
     public static boolean payByInvoice;
+    // TG fork: master switch for the local folders & pins feature (device-only data)
+    public static boolean localFoldersEnabled = true;
     public static int stealthModeSendMessageConfirm = 2;
     private static int lastLocalId = -210000;
     public static boolean walletUseFingerprintLock = true;
@@ -682,6 +693,8 @@ public class SharedConfig {
             useCamera2Force = !preferences.contains("useCamera2Force_2") ? null : preferences.getBoolean("useCamera2Force_2", false);
             useSurfaceInStories = preferences.getBoolean("useSurfaceInStories", Build.VERSION.SDK_INT >= 30);
             payByInvoice = preferences.getBoolean("payByInvoice", false);
+            // TG fork: local folders & pins feature switch (default on)
+            localFoldersEnabled = preferences.getBoolean("localFoldersEnabled", true);
             photoViewerBlur = preferences.getBoolean("photoViewerBlur", true);
             multipleReactionsPromoShowed = preferences.getBoolean("multipleReactionsPromoShowed", false);
             callEncryptionHintDisplayedCount = preferences.getInt("callEncryptionHintDisplayedCount", 0);

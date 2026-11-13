@@ -3116,6 +3116,24 @@
     <string name="FilterNameNonMuted">Not Muted</string>
     <string name="FilterNameUnread">Unread</string>
     <string name="FilterAddTo">Add to folder</string>
+    <!-- TG fork: local (device-only) folders & pins -->
+    <string name="Local">Local</string>
+    <string name="LocalFolder">Local Folder</string>
+    <string name="LocalFolders">Local Folders</string>
+    <string name="LocalFoldersAndPins">Local Folders &amp; Pins</string>
+    <string name="LocalFoldersAndPinsInfo">Device-only folders and pins, not synced</string>
+    <string name="LocalFoldersInfo">Local folders and pins are stored only on this device. They are not synced to Telegram and do not count towards folder or pin limits.</string>
+    <string name="LocalFoldersEnabled">Enable local folders &amp; pins</string>
+    <string name="LocalFolderNew">New Local Folder</string>
+    <string name="LocalFolderNameHint">Folder name</string>
+    <string name="LocalFolderAddChats">Add Chats</string>
+    <string name="LocalFolderRemoveChatHint">Tap a chat to remove it from this local folder.</string>
+    <string name="LocalFolderDelete">Delete Local Folder</string>
+    <string name="LocalFolderDeleteAlert">Delete this local folder? The chats themselves will not be deleted.</string>
+    <string name="LocalFolderChatsCount">%d chats</string>
+    <string name="PinLocally">Pin locally</string>
+    <string name="UnpinLocally">Unpin locally</string>
+    <string name="AddToLocalFolder">Add to local folder</string>
     <string name="FilterRemoveFrom">Remove from folder</string>
     <string name="FilterChoose">Choose a folder</string>
     <string name="FilterUserAddedToExisting">**%1$s** added to **%2$s**</string>

@@ -219,6 +219,8 @@ public class NotificationCenter {
     public static final int themeUploadedToServer = totalEvents++;
     public static final int themeUploadError = totalEvents++;
     public static final int dialogFiltersUpdated = totalEvents++;
+    // TG fork: local (device-only) folders or pins changed
+    public static final int localFoldersUpdated = totalEvents++;
     public static final int filterSettingsUpdated = totalEvents++;
     public static final int suggestedFiltersLoaded = totalEvents++;
     public static final int updateBotMenuButton = totalEvents++;
