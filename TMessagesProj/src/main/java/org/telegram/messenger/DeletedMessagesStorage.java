@@ -246,6 +246,23 @@ public class DeletedMessagesStorage extends SQLiteOpenHelper {
         return paths;
     }
 
+    // TG fork (audit G4): deletes retained rows of one dialog whose
+    // original message date falls in [minDate, maxDate] (unix seconds,
+    // inclusive on both ends, matching the stock range-delete bounds);
+    // returns their media paths so the caller can remove the copied files.
+    public synchronized ArrayList<String> purgeRange(long dialogId, int minDate, int maxDate) {
+        String where = "dialog_id = ? AND date >= ? AND date <= ?";
+        String[] args = new String[]{Long.toString(dialogId), Integer.toString(minDate), Integer.toString(maxDate)};
+        ArrayList<String> paths = collectMediaPaths(where, args);
+        try {
+            SQLiteDatabase db = getWritableDatabase();
+            db.delete(TABLE_MESSAGES, where, args);
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+        return paths;
+    }
+
     // Deletes every retained row (all dialogs); returns all media paths.
     public synchronized ArrayList<String> purgeAll() {
         ArrayList<String> paths = collectMediaPaths(null, null);
@@ -300,6 +317,28 @@ public class DeletedMessagesStorage extends SQLiteOpenHelper {
         return 0;
     }
 
+    // TG fork (audit G1): total bytes held by retained rows — copied media
+    // bytes plus the serialized message blobs. Text-only rows hold no
+    // media, but their blob still occupies the database, so a media-only
+    // sum cannot bound the database's growth.
+    public synchronized long getTotalRetainedBytes() {
+        Cursor cursor = null;
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            cursor = db.rawQuery("SELECT COALESCE(SUM(media_size), 0) + COALESCE(SUM(LENGTH(blob)), 0) FROM " + TABLE_MESSAGES, null);
+            if (cursor.moveToFirst()) {
+                return cursor.getLong(0);
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return 0;
+    }
+
     public synchronized int getTotalCount() {
         Cursor cursor = null;
         try {
@@ -318,14 +357,42 @@ public class DeletedMessagesStorage extends SQLiteOpenHelper {
         return 0;
     }
 
-    // Oldest row that actually holds copied media bytes (the byte cap is
-    // effectively a media cap; text-only rows are not evicted for size).
+    // Oldest row that actually holds copied media bytes (used by the
+    // media-byte cap; the total-size / row-count cap uses getOldestEntry,
+    // which has no media filter and so also evicts text-only rows).
     public synchronized Entry getOldestMediaEntry() {
         Cursor cursor = null;
         try {
             SQLiteDatabase db = getReadableDatabase();
             cursor = db.query(TABLE_MESSAGES, new String[]{"dialog_id", "message_id", "media_path", "media_size"},
                     "media_size > 0", null, null, null, "retained_at ASC", "1");
+            if (cursor.moveToFirst()) {
+                Entry entry = new Entry();
+                entry.dialogId = cursor.getLong(0);
+                entry.messageId = cursor.getInt(1);
+                entry.mediaPath = cursor.getString(2);
+                entry.mediaSize = cursor.getLong(3);
+                return entry;
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return null;
+    }
+
+    // TG fork (audit G1): oldest retained row of any kind — same shape as
+    // getOldestMediaEntry but WITHOUT the media filter, so text/blob rows
+    // can be evicted too.
+    public synchronized Entry getOldestEntry() {
+        Cursor cursor = null;
+        try {
+            SQLiteDatabase db = getReadableDatabase();
+            cursor = db.query(TABLE_MESSAGES, new String[]{"dialog_id", "message_id", "media_path", "media_size"},
+                    null, null, null, null, "retained_at ASC", "1");
             if (cursor.moveToFirst()) {
                 Entry entry = new Entry();
                 entry.dialogId = cursor.getLong(0);

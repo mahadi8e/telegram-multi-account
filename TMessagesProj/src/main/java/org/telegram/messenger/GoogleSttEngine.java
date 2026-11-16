@@ -26,6 +26,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.util.Locale;
 
@@ -53,21 +56,31 @@ public class GoogleSttEngine extends ForkSttEngine {
             return;
         }
         try {
-            byte[] audio = readFileBytes(audioFile, MAX_UPLOAD_BYTES);
+            // TG fork (audit G2): the size cap is checked before any
+            // connection is opened, and the audio is base64-encoded and
+            // streamed in chunks — previously the file, its base64 string
+            // and the whole JSON body were all held in memory at once.
+            if (audioFile.length() > MAX_UPLOAD_BYTES) {
+                throw new IOException("Audio file is too large");
+            }
             JSONObject config = new JSONObject();
             config.put("encoding", "OGG_OPUS");
             // Opus inside Ogg always decodes at 48 kHz.
             config.put("sampleRateHertz", 48000);
             config.put("languageCode", resolveLanguageCode(languageHint));
             config.put("enableAutomaticPunctuation", true);
-            JSONObject audioJson = new JSONObject();
-            audioJson.put("content", Base64.encodeToString(audio, Base64.NO_WRAP));
-            JSONObject body = new JSONObject();
-            body.put("config", config);
-            body.put("audio", audioJson);
+            // The request body is {"config":<config>,"audio":{"content":
+            // "<base64>"}} — the fixed prefix and suffix are written
+            // around the streamed base64 content.
+            final byte[] prefix = ("{\"config\":" + config.toString() + ",\"audio\":{\"content\":\"").getBytes("UTF-8");
+            final byte[] suffix = "\"}}".getBytes("UTF-8");
 
             String url = "https://speech.googleapis.com/v1/speech:recognize?key=" + URLEncoder.encode(key.trim(), "UTF-8");
-            String response = httpPost(url, body.toString().getBytes("UTF-8"), "application/json; charset=utf-8", null);
+            String response = httpPostStreaming(url, "application/json; charset=utf-8", null, -1, out -> {
+                out.write(prefix);
+                writeFileBase64(audioFile, out);
+                out.write(suffix);
+            });
             JSONObject json = new JSONObject(response);
             JSONArray results = json.optJSONArray("results");
             if (results == null || results.length() == 0) {
@@ -100,6 +113,49 @@ public class GoogleSttEngine extends ForkSttEngine {
         } catch (Exception e) {
             // Deliberately no request details here: the URL contains the key.
             callback.onError("Google Speech-to-Text failed: " + e.getMessage());
+        }
+    }
+
+    // TG fork (audit G2): streams the file base64-encoded (NO_WRAP)
+    // without ever holding the whole file or the whole encoded string in
+    // memory. Input is consumed in multiples of 3 bytes so each chunk
+    // encodes independently; only a <3-byte leftover is carried between
+    // reads, and the final partial group (with padding) is emitted at
+    // EOF. Does not close the stream.
+    private static void writeFileBase64(File file, OutputStream out) throws IOException {
+        FileInputStream in = new FileInputStream(file);
+        try {
+            byte[] buffer = new byte[8190]; // multiple of 3
+            byte[] leftover = new byte[0];
+            int count;
+            while ((count = in.read(buffer)) != -1) {
+                byte[] chunk;
+                if (leftover.length == 0) {
+                    chunk = buffer;
+                } else {
+                    chunk = new byte[leftover.length + count];
+                    System.arraycopy(leftover, 0, chunk, 0, leftover.length);
+                    System.arraycopy(buffer, 0, chunk, leftover.length, count);
+                    count = chunk.length;
+                }
+                int completeLength = count - (count % 3);
+                if (completeLength > 0) {
+                    out.write(Base64.encodeToString(chunk, 0, completeLength, Base64.NO_WRAP).getBytes("UTF-8"));
+                }
+                int rem = count - completeLength;
+                leftover = new byte[rem];
+                if (rem > 0) {
+                    System.arraycopy(chunk, completeLength, leftover, 0, rem);
+                }
+            }
+            if (leftover.length > 0) {
+                out.write(Base64.encodeToString(leftover, Base64.NO_WRAP).getBytes("UTF-8"));
+            }
+        } finally {
+            try {
+                in.close();
+            } catch (Exception ignore) {
+            }
         }
     }
 

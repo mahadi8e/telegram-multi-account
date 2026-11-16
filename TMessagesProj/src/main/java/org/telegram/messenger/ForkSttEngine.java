@@ -80,38 +80,24 @@ public abstract class ForkSttEngine {
         }
     }
 
-    // Reads a whole (voice-sized) file into memory. Throws an IOException
-    // with a key-free, URL-free message when the file is unreasonably
-    // large for a transcription upload.
-    protected static byte[] readFileBytes(File file, int maxBytes) throws IOException {
-        if (file.length() > maxBytes) {
-            throw new IOException("Audio file is too large");
-        }
-        FileInputStream in = new FileInputStream(file);
-        try {
-            ByteArrayOutputStream result = new ByteArrayOutputStream();
-            byte[] buffer = new byte[16384];
-            int count;
-            while ((count = in.read(buffer)) != -1) {
-                result.write(buffer, 0, count);
-                if (result.size() > maxBytes) {
-                    throw new IOException("Audio file is too large");
-                }
-            }
-            return result.toByteArray();
-        } finally {
-            try {
-                in.close();
-            } catch (Exception ignore) {
-            }
-        }
+    // Body of a streaming POST: the implementation writes the request
+    // body to the given stream (in chunks) and returns; the helper closes
+    // the stream afterwards.
+    protected interface BodyWriter {
+        void write(OutputStream out) throws IOException;
     }
 
-    // Minimal HTTPS POST helper for the cloud engines. Returns the
-    // response body on HTTP 200 and throws an IOException (without any URL
-    // or credential material in the message) otherwise. Callers must
-    // invoke it on a background thread.
-    protected static String httpPost(String urlString, byte[] body, String contentType, Map<String, String> headers) throws IOException {
+    // TG fork (audit G2): streaming HTTPS POST helper for the cloud
+    // engines. The body is written straight to the connection, so no
+    // whole-file or whole-body copy ever exists in memory (the previous
+    // byte[]-based helper forced callers to buffer everything up front).
+    // When fixedLength >= 0 the exact content length is declared up
+    // front (setFixedLengthStreamingMode); otherwise chunked streaming
+    // with an 8 KB chunk is used. Returns the response body on HTTP 200
+    // and throws an IOException (without any URL or credential material
+    // in the message) otherwise. Callers must invoke it on a background
+    // thread.
+    protected static String httpPostStreaming(String urlString, String contentType, Map<String, String> headers, long fixedLength, BodyWriter writer) throws IOException {
         HttpURLConnection connection = null;
         try {
             URL url = new URL(urlString);
@@ -128,9 +114,18 @@ public abstract class ForkSttEngine {
                     connection.setRequestProperty(entry.getKey(), entry.getValue());
                 }
             }
+            if (fixedLength >= 0) {
+                connection.setFixedLengthStreamingMode(fixedLength);
+            } else {
+                connection.setChunkedStreamingMode(8192);
+            }
             OutputStream out = connection.getOutputStream();
-            out.write(body);
-            out.close();
+            try {
+                writer.write(out);
+                out.flush();
+            } finally {
+                out.close();
+            }
             int code = connection.getResponseCode();
             InputStream in = code == 200 ? connection.getInputStream() : connection.getErrorStream();
             String response = readAll(in);
@@ -141,6 +136,24 @@ public abstract class ForkSttEngine {
         } finally {
             if (connection != null) {
                 connection.disconnect();
+            }
+        }
+    }
+
+    // Copies a file to the given stream in 8 KB chunks — no whole-file
+    // buffering. Does not close the stream.
+    protected static void writeFileToStream(File file, OutputStream out) throws IOException {
+        FileInputStream in = new FileInputStream(file);
+        try {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = in.read(buffer)) != -1) {
+                out.write(buffer, 0, count);
+            }
+        } finally {
+            try {
+                in.close();
+            } catch (Exception ignore) {
             }
         }
     }

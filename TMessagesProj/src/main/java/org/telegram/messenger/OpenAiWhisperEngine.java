@@ -46,8 +46,14 @@ public class OpenAiWhisperEngine extends ForkSttEngine {
             return;
         }
         try {
-            byte[] audio = readFileBytes(audioFile, MAX_UPLOAD_BYTES);
-            String response = postMultipart(key.trim(), audio, languageHint);
+            // TG fork (audit G2): the size cap is checked before any
+            // connection is opened, and the file is streamed — it is
+            // never buffered in memory (previously the file was held in
+            // up to three full copies at once).
+            if (audioFile.length() > MAX_UPLOAD_BYTES) {
+                throw new IOException("Audio file is too large");
+            }
+            String response = postMultipart(key.trim(), audioFile, languageHint);
             JSONObject json = new JSONObject(response);
             String text = json.optString("text", "").trim();
             if (text.length() == 0) {
@@ -67,24 +73,33 @@ public class OpenAiWhisperEngine extends ForkSttEngine {
     // part filename always ends in .ogg: the API picks the decoder from
     // the extension, while the on-disk cache name is not guaranteed to
     // carry one (the content is OGG/Opus either way).
-    private static String postMultipart(String key, byte[] audio, String languageHint) throws IOException {
+    // TG fork (audit G2): the framing head and tail are fixed strings, so
+    // the exact content length is known up front — the head is written,
+    // the file is streamed in 8 KB chunks, then the tail, all under
+    // setFixedLengthStreamingMode. Only the small head is held in memory.
+    private static String postMultipart(String key, final File audioFile, String languageHint) throws IOException {
         String boundary = "ForkSttBoundary" + Long.toHexString(System.nanoTime());
-        ByteArrayOutputStream body = new ByteArrayOutputStream();
-        writeField(body, boundary, "model", "whisper-1");
+        ByteArrayOutputStream headBuffer = new ByteArrayOutputStream();
+        writeField(headBuffer, boundary, "model", "whisper-1");
         // verbose_json makes the API report the detected language.
-        writeField(body, boundary, "response_format", "verbose_json");
+        writeField(headBuffer, boundary, "response_format", "verbose_json");
         if (languageHint != null && languageHint.length() > 0) {
-            writeField(body, boundary, "language", languageHint);
+            writeField(headBuffer, boundary, "language", languageHint);
         }
-        body.write(("--" + boundary + "\r\n").getBytes("UTF-8"));
-        body.write("Content-Disposition: form-data; name=\"file\"; filename=\"voice.ogg\"\r\n".getBytes("UTF-8"));
-        body.write("Content-Type: audio/ogg\r\n\r\n".getBytes("UTF-8"));
-        body.write(audio);
-        body.write(("\r\n--" + boundary + "--\r\n").getBytes("UTF-8"));
+        headBuffer.write(("--" + boundary + "\r\n").getBytes("UTF-8"));
+        headBuffer.write("Content-Disposition: form-data; name=\"file\"; filename=\"voice.ogg\"\r\n".getBytes("UTF-8"));
+        headBuffer.write("Content-Type: audio/ogg\r\n\r\n".getBytes("UTF-8"));
+        final byte[] head = headBuffer.toByteArray();
+        final byte[] tail = ("\r\n--" + boundary + "--\r\n").getBytes("UTF-8");
 
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + key);
-        return httpPost("https://api.openai.com/v1/audio/transcriptions", body.toByteArray(), "multipart/form-data; boundary=" + boundary, headers);
+        long contentLength = head.length + audioFile.length() + tail.length;
+        return httpPostStreaming("https://api.openai.com/v1/audio/transcriptions", "multipart/form-data; boundary=" + boundary, headers, contentLength, out -> {
+            out.write(head);
+            writeFileToStream(audioFile, out);
+            out.write(tail);
+        });
     }
 
     private static void writeField(ByteArrayOutputStream body, String boundary, String name, String value) throws IOException {

@@ -2344,8 +2344,14 @@ public class FileLoadOperation {
         // request and never reports a 420 (or the wait value) to Java — the
         // only signals available here are caughtPremiumFloodWait and the age
         // of in-flight requests: a request the server is holding stays
-        // outstanding far longer than a normal chunk round trip. While such
-        // fresh evidence of throttling exists, count one strike per backoff
+        // outstanding far longer than a normal chunk round trip. A request
+        // counts as held only once it has been outstanding for 10 s: a chunk
+        // on a slow network can legitimately take longer than 2 s, so this
+        // observation threshold is deliberately far above the delay base
+        // below — the two numbers are unrelated constants (the threshold is
+        // a heuristic for "the server is holding this request"; the base is
+        // native's minimum FLOOD_WAIT clamp) (audit G3). While such fresh
+        // evidence of throttling exists, count one strike per backoff
         // window and, from the third strike on, defer new part dispatches by
         // min(2000 ms * 2^(strikes-2), 300 s) — 2000 ms being the minimum
         // wait native tgnet clamps any FLOOD_WAIT to, since the real server
@@ -2361,7 +2367,7 @@ public class FileLoadOperation {
             if (now >= forkFloodNextStrikeAt) {
                 boolean heldRequest = false;
                 for (int i = 0; i < requestInfos.size(); i++) {
-                    if (now - requestInfos.get(i).requestStartTime >= 2000) {
+                    if (now - requestInfos.get(i).requestStartTime >= 10000) {
                         heldRequest = true;
                         break;
                     }

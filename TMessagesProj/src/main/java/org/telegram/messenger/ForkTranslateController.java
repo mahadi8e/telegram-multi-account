@@ -73,7 +73,10 @@ public class ForkTranslateController extends BaseController {
     // Fork-owned auto-translate dialogs: dialogId -> target language.
     private final HashMap<Long, String> autoDialogs = new HashMap<>();
     private boolean autoLoaded;
-    private final HashSet<Integer> autoInFlight = new HashSet<>();
+    // TG fork (audit G5): keyed by (dialogId, messageId) — message ids
+    // repeat across dialogs within one account, so an id-only set could
+    // silently skip a same-id message in another dialog.
+    private final HashSet<Long> autoInFlight = new HashSet<>();
 
     public ForkTranslateController(int num) {
         super(num);
@@ -200,8 +203,9 @@ public class ForkTranslateController extends BaseController {
             if (TextUtils.isEmpty(text)) {
                 continue;
             }
+            final long inFlightKey = (dialogId << 32) ^ (messageObject.getId() & 0xffffffffL);
             synchronized (autoInFlight) {
-                if (!autoInFlight.add(messageObject.getId())) {
+                if (!autoInFlight.add(inFlightKey)) {
                     continue;
                 }
             }
@@ -211,7 +215,7 @@ public class ForkTranslateController extends BaseController {
                 @Override
                 public void onSuccess(String translatedText, String detectedFromLanguage) {
                     synchronized (autoInFlight) {
-                        autoInFlight.remove(messageId);
+                        autoInFlight.remove(inFlightKey);
                     }
                     // Honour the stock "do not translate" language list and
                     // never "translate" a message into its own language.
@@ -225,7 +229,7 @@ public class ForkTranslateController extends BaseController {
                 @Override
                 public void onError(int errorCode, String detail) {
                     synchronized (autoInFlight) {
-                        autoInFlight.remove(messageId);
+                        autoInFlight.remove(inFlightKey);
                     }
                 }
             });

@@ -23270,6 +23270,11 @@ public class MessagesController extends BaseController implements NotificationCe
                     ArrayList<Integer> dbMessages = getMessagesStorage().getCachedMessagesInRange(dialogId, minDate, maxDate);
                     getMessagesStorage().markMessagesAsDeleted(dialogId, dbMessages, false, true, 0, 0);
                     getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, 0, dbMessages, null);
+                    // TG fork (audit G4): the user's own range-delete must
+                    // also drop any vault copies in the same date range.
+                    if (SharedConfig.forkDeletedMessagesEnabled) {
+                        getMessagesStorage().getStorageQueue().postRunnable(() -> ForkDeletedMessagesController.getInstance(currentAccount).purgeRange(dialogId, minDate, maxDate));
+                    }
                     AndroidUtilities.runOnUIThread(() -> {
                         getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, dbMessages, channelId, false);
                         if (res.offset > 0) {

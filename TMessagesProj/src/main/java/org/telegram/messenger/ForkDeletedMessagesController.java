@@ -58,6 +58,11 @@ public class ForkDeletedMessagesController extends BaseController {
     // only; own deletes are structurally excluded before this matters).
     private static final long DELETED_BY_ME_TTL_MS = 10L * 60 * 1000;
 
+    // TG fork (audit G1): hard bound on retained rows of any kind, so the
+    // vault database stays bounded even for text-only rows (which hold no
+    // media bytes and so escape the byte cap).
+    private static final int MAX_RETAINED_ROWS = 5000;
+
     private static volatile ForkDeletedMessagesController[] Instance = new ForkDeletedMessagesController[UserConfig.MAX_ACCOUNT_COUNT];
 
     public static ForkDeletedMessagesController getInstance(int num) {
@@ -391,6 +396,27 @@ public class ForkDeletedMessagesController extends BaseController {
             String path = storage.deleteRetained(oldest.dialogId, oldest.messageId);
             deleteVaultFile(path);
         }
+        // TG fork (audit G1): the loop above only ever evicts rows that
+        // hold copied media, so text/blob rows accumulated without bound.
+        // Evict the oldest rows of ANY kind while the total retained bytes
+        // (media + serialized blobs) exceed the cap, or while the row
+        // count exceeds MAX_RETAINED_ROWS. With the "text only" preset
+        // (cap 0) there is no byte budget for blobs — media is already
+        // fully evicted by the first loop — so only the row cap applies.
+        guard = 0;
+        while (guard++ < 10000) {
+            boolean overBytes = capBytes > 0 && storage.getTotalRetainedBytes() > capBytes;
+            boolean overRows = storage.getTotalCount() > MAX_RETAINED_ROWS;
+            if (!overBytes && !overRows) {
+                break;
+            }
+            DeletedMessagesStorage.Entry oldest = storage.getOldestEntry();
+            if (oldest == null) {
+                break;
+            }
+            String path = storage.deleteRetained(oldest.dialogId, oldest.messageId);
+            deleteVaultFile(path);
+        }
     }
 
     // Re-runs cap eviction off the caller's thread (e.g. after the cap was
@@ -405,6 +431,17 @@ public class ForkDeletedMessagesController extends BaseController {
     // Callers run this off the UI thread (storage queue or the fork queue).
     public void purgeDialog(long dialogId) {
         ArrayList<String> paths = storage.purgeDialog(dialogId);
+        for (int i = 0, size = paths.size(); i < size; i++) {
+            deleteVaultFile(paths.get(i));
+        }
+    }
+
+    // TG fork (audit G4): purge one dialog's retained copies whose
+    // original message dates fall in [minDate, maxDate] — mirrors
+    // purgeDialog for the user's own range-delete flow. Synchronous;
+    // callers run this off the UI thread (storage queue).
+    public void purgeRange(long dialogId, int minDate, int maxDate) {
+        ArrayList<String> paths = storage.purgeRange(dialogId, minDate, maxDate);
         for (int i = 0, size = paths.size(); i < size; i++) {
             deleteVaultFile(paths.get(i));
         }
