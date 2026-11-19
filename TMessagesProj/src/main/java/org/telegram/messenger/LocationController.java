@@ -361,7 +361,14 @@ public class LocationController extends BaseController implements NotificationCe
             }
             requests.clear();
         }
-        if (!sharingLocations.isEmpty()) {
+        // TG fork: a dormant (not selected) account must not send geo-live
+        // edits or resume its connection — only the live account broadcasts.
+        // The sharing stays registered (its server-side lifetime is
+        // time-based) and sending resumes by itself on switch-back, when
+        // this same code path passes the live check. Local bookkeeping
+        // above (request cleanup) and below (GPS stop) stays as stock.
+        final boolean liveAccount = UserConfig.isLiveAccount(currentAccount);
+        if (liveAccount && !sharingLocations.isEmpty()) {
             int date = getConnectionsManager().getCurrentTime();
             float[] result = new float[1];
             for (int a = 0; a < sharingLocations.size(); a++) {
@@ -437,7 +444,9 @@ public class LocationController extends BaseController implements NotificationCe
                 requests.put(reqId[0], 0);
             }
         }
-        getConnectionsManager().resumeNetworkMaybe();
+        if (liveAccount) {
+            getConnectionsManager().resumeNetworkMaybe();
+        }
         if (shouldStopGps()) {
             stop(false);
         }
