@@ -33,7 +33,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class ForkTranscribeAlert {
 
-    private final BottomSheet sheet;
+    private BottomSheet sheet;
     private final TextView statusView;
     private final TextView resultView;
     private final TextView copyButton;
