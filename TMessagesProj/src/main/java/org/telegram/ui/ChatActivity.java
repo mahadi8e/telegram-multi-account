@@ -158,6 +158,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.ForkTranslateController;
 import org.telegram.messenger.ForkTranscribeController;
+import org.telegram.messenger.ForkSttEngine;
 import org.telegram.messenger.ForkDeletedMessagesController;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DownloadController;
@@ -12009,9 +12010,10 @@ public class ChatActivity extends BaseFragment implements
         if (getParentActivity() == null || messageObject == null) {
             return;
         }
-        // TG fork privacy rule: all v1 engines are cloud, so secret chats
-        // are refused here (and again inside ForkTranscribeController).
-        if (DialogObject.isEncryptedDialog(getDialogId())) {
+        // TG fork privacy rule: cloud engines are refused in secret chats
+        // here (and again inside ForkTranscribeController); the on-device
+        // engine is allowed because no audio leaves the phone.
+        if (ForkSttEngine.isCloudEngine(SharedConfig.forkSttEngine) && DialogObject.isEncryptedDialog(getDialogId())) {
             showDialog(new AlertDialog.Builder(getParentActivity())
                     .setTitle(LocaleController.getString(R.string.ForkSttCloudNoticeTitle))
                     .setMessage(LocaleController.getString(R.string.ForkSttSecretChatBlocked))
@@ -12019,7 +12021,7 @@ public class ChatActivity extends BaseFragment implements
                     .create());
             return;
         }
-        if (!SharedConfig.forkSttCloudConsent) {
+        if (ForkSttEngine.isCloudEngine(SharedConfig.forkSttEngine) && !SharedConfig.forkSttCloudConsent) {
             showForkSttConsent(() -> showForkTranscription(messageObject));
             return;
         }
@@ -12046,6 +12048,10 @@ public class ChatActivity extends BaseFragment implements
                 return LocaleController.getString(R.string.ForkSttTtlBlocked);
             case ForkTranscribeController.ERROR_NOT_DOWNLOADED:
                 return LocaleController.getString(R.string.ForkSttNotDownloaded);
+            case ForkTranscribeController.ERROR_MODEL_NOT_DOWNLOADED:
+                return LocaleController.getString(R.string.ForkSttModelMissing);
+            case ForkTranscribeController.ERROR_TOO_LONG:
+                return LocaleController.getString(R.string.ForkSttTooLong);
             case ForkTranscribeController.ERROR_NO_API_KEY:
                 return LocaleController.getString(R.string.ForkSttNoApiKey);
             default:
@@ -46910,10 +46916,11 @@ public class ChatActivity extends BaseFragment implements
                 }
             }
             // TG fork: fork voice-to-text entry point (Feature 3). Shown only
-            // for voice messages while the feature is enabled, and never in
-            // secret chats (all v1 engines are cloud). The stock transcribe
-            // button and its Premium flow are untouched.
-            if (SharedConfig.forkSttEnabled && selectedObject != null && selectedObject.isVoice() && !DialogObject.isEncryptedDialog(dialog_id)) {
+            // for voice messages while the feature is enabled; secret chats
+            // are excluded only for cloud engines (the on-device engine
+            // never sends audio anywhere, so it is allowed there). The
+            // stock transcribe button and its Premium flow are untouched.
+            if (SharedConfig.forkSttEnabled && selectedObject != null && selectedObject.isVoice() && (!DialogObject.isEncryptedDialog(dialog_id) || !ForkSttEngine.isCloudEngine(SharedConfig.forkSttEngine))) {
                 items.add(LocaleController.getString(R.string.ForkSttTranscribe));
                 options.add(OPTION_FORK_TRANSCRIBE);
                 icons.add(R.drawable.msg_message);

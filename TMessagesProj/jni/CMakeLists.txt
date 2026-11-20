@@ -248,6 +248,25 @@ set_property(SOURCE ${PRISMA_BRIDGE_SOURCES} APPEND PROPERTY
 set_property(SOURCE ${PRISMA_BRIDGE_SOURCES} APPEND PROPERTY
         COMPILE_DEFINITIONS BOOST_REGEX_STANDALONE)
 
+# TG fork: whisper.cpp on-device speech-to-text (Feature 3). Upstream
+# v1.7.5 sources vendored under whisper/ (MIT, see whisper/LICENSE) and
+# built as static libraries linked into the main library; the JNI bridge
+# is whisper_jni.cpp. GGML_NATIVE stays off (cross-compiling), OpenMP
+# stays off (ggml falls back to pthreads) and no GPU backend is enabled,
+# so only the CPU backend is built. The configuration was verified
+# standalone against the NDK for arm64-v8a, armeabi-v7a, x86 and x86_64
+# before being wired in here.
+set(BUILD_SHARED_LIBS OFF)
+set(WHISPER_BUILD_TESTS OFF)
+set(WHISPER_BUILD_EXAMPLES OFF)
+set(WHISPER_BUILD_SERVER OFF)
+set(GGML_NATIVE OFF)
+set(GGML_OPENMP OFF)
+add_subdirectory(whisper ${CMAKE_CURRENT_BINARY_DIR}/whisper)
+target_sources(${NATIVE_LIB} PRIVATE whisper_jni.cpp)
+target_include_directories(${NATIVE_LIB} PRIVATE whisper/include)
+target_link_libraries(${NATIVE_LIB} whisper)
+
 target_compile_options(${NATIVE_LIB} PUBLIC
         -ffast-math -Oz -funroll-loops -ffast-math -fno-strict-aliasing -fno-math-errno)
 

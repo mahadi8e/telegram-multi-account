@@ -442,8 +442,9 @@ public class SharedConfig {
     // third party. API keys are kept only in these prefs and never logged.
     public static final int FORK_STT_ENGINE_OPENAI = 0;
     public static final int FORK_STT_ENGINE_GOOGLE = 1;
+    public static final int FORK_STT_ENGINE_ONDEVICE = 2;
     public static boolean forkSttEnabled = false;
-    public static int forkSttEngine = FORK_STT_ENGINE_OPENAI;
+    public static int forkSttEngine = FORK_STT_ENGINE_ONDEVICE;
     public static String forkSttOpenAiKey = "";
     public static String forkSttGoogleKey = "";
     public static boolean forkSttCloudConsent = false;
@@ -910,7 +911,7 @@ public class SharedConfig {
             forkCloudTranslateConsent = preferences.getBoolean("forkCloudTranslateConsent", false);
             // TG fork: voice-to-text engine settings (Feature 3); off by default
             forkSttEnabled = preferences.getBoolean("forkSttEnabled", false);
-            forkSttEngine = preferences.getInt("forkSttEngine", FORK_STT_ENGINE_OPENAI);
+            forkSttEngine = preferences.getInt("forkSttEngine", FORK_STT_ENGINE_ONDEVICE);
             forkSttOpenAiKey = preferences.getString("forkSttOpenAiKey", "");
             forkSttGoogleKey = preferences.getString("forkSttGoogleKey", "");
             forkSttCloudConsent = preferences.getBoolean("forkSttCloudConsent", false);

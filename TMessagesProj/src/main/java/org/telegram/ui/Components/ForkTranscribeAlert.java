@@ -43,6 +43,8 @@ public class ForkTranscribeAlert {
         switch (engine) {
             case SharedConfig.FORK_STT_ENGINE_GOOGLE:
                 return LocaleController.getString(R.string.ForkSttEngineGoogle);
+            case SharedConfig.FORK_STT_ENGINE_ONDEVICE:
+                return LocaleController.getString(R.string.ForkSttEngineOnDevice);
             default:
                 return LocaleController.getString(R.string.ForkSttEngineOpenAi);
         }

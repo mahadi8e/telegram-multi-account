@@ -3167,13 +3167,22 @@
     <!-- TG fork: fork voice-to-text engines (Feature 3) -->
     <string name="ForkSttTranscribe">Transcribe (fork)</string>
     <string name="ForkSttSettings">Voice-to-Text (fork)</string>
-    <string name="ForkSttSettingsInfo">Cloud speech-to-text for voice messages</string>
+    <string name="ForkSttSettingsInfo">On-device or cloud speech-to-text for voice messages</string>
     <string name="ForkSttOff">Off</string>
     <string name="ForkSttEnabled">Enable voice-to-text (fork)</string>
-    <string name="ForkSttInfo">Transcribe voice messages with a cloud speech-to-text service using your own API key. The voice file is sent to the selected provider; secret chats and self-destructing voice messages are never transcribed. Telegram\'s own transcription is unchanged.</string>
+    <string name="ForkSttInfo">Transcribe voice messages on this device with the Whisper model — no API key, works offline and in secret chats — or with a cloud speech-to-text service using your own API key. With a cloud engine the voice file is sent to the selected provider and secret chats are never transcribed; self-destructing voice messages are never transcribed by any engine. Telegram\'s own transcription is unchanged.</string>
     <string name="ForkSttEngineHeader">Engine</string>
     <string name="ForkSttEngineOpenAi">OpenAI Whisper</string>
     <string name="ForkSttEngineGoogle">Google Cloud Speech-to-Text</string>
+    <string name="ForkSttEngineOnDevice">On-device (Whisper)</string>
+    <string name="ForkSttModel">On-device model</string>
+    <string name="ForkSttModelNotDownloaded">Not downloaded — tap to download (≈57 MB)</string>
+    <string name="ForkSttModelDownloading">Downloading model…</string>
+    <string name="ForkSttModelDownloadFailed">Could not download the speech model. Check your connection and try again.</string>
+    <string name="ForkSttModelDeleteTitle">Delete model</string>
+    <string name="ForkSttModelDeleteMessage">Delete the downloaded on-device speech model? You can download it again later.</string>
+    <string name="ForkSttModelMissing">The on-device speech model is not downloaded yet. Open Settings, Voice-to-Text (fork), and download it first.</string>
+    <string name="ForkSttTooLong">This voice message is too long for on-device transcription (maximum 20 minutes).</string>
     <string name="ForkSttApiKeysHeader">API keys</string>
     <string name="ForkSttOpenAiKey">OpenAI API key</string>
     <string name="ForkSttGoogleKey">Google Cloud API key</string>

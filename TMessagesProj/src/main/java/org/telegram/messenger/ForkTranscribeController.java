@@ -12,11 +12,12 @@
  *    (TranscriptionsStorage -> ForkSttEngine -> cache store), with all
  *    work on a dedicated serial DispatchQueue (one transcription at a
  *    time — sane CPU/battery behaviour),
- *  - hard privacy rules: the v1 engines are all cloud, so encrypted
- *    (secret) chats are refused — checked both at request entry and
- *    again at engine dispatch — and self-destructing (TTL) voice
- *    messages are refused for every engine, mirroring the stock rule
- *    that hides its own transcription button for ephemeral media,
+ *  - hard privacy rules: cloud engines are refused for encrypted
+ *    (secret) chats — checked both at request entry and again at engine
+ *    dispatch — while the on-device engine is allowed there because no
+ *    audio leaves the phone; self-destructing (TTL) voice messages are
+ *    refused for every engine, mirroring the stock rule that hides its
+ *    own transcription button for ephemeral media,
  *  - voice messages only: round videos (video notes) are refused,
  *  - the voice file must already be downloaded (via the normal stock
  *    download); this controller never starts a download itself.
@@ -48,6 +49,12 @@ public class ForkTranscribeController extends BaseController {
     public static final int ERROR_TTL_MEDIA = 5;
     public static final int ERROR_NOT_DOWNLOADED = 6;
     public static final int ERROR_NOT_VOICE = 7;
+    public static final int ERROR_MODEL_NOT_DOWNLOADED = 8;
+    public static final int ERROR_TOO_LONG = 9;
+
+    // TG fork: cap for the on-device engine — past 20 minutes the decoded
+    // PCM buffer and the CPU time grow too large for a phone.
+    public static final int MAX_ONDEVICE_DURATION_SECONDS = 20 * 60;
 
     private static volatile ForkTranscribeController[] Instance = new ForkTranscribeController[UserConfig.MAX_ACCOUNT_COUNT];
 
@@ -93,9 +100,8 @@ public class ForkTranscribeController extends BaseController {
             return;
         }
         // TG fork privacy rule (entry check): cloud engines never receive
-        // audio from a secret chat. Both v1 engines are cloud; a future
-        // on-device engine (isCloud() == false) would be allowed here,
-        // mirroring the ML Kit policy of Feature 2.
+        // audio from a secret chat. The on-device engine (isCloud() ==
+        // false) is allowed, mirroring the ML Kit policy of Feature 2.
         if (engine.isCloud() && DialogObject.isEncryptedDialog(dialogId)) {
             AndroidUtilities.runOnUIThread(() -> callback.onError(ERROR_SECRET_CHAT, null));
             return;
@@ -117,6 +123,19 @@ public class ForkTranscribeController extends BaseController {
             }
         }
         final int duration = (int) Math.round(messageObject.getDuration());
+        // TG fork: the on-device engine needs its model on disk (the user
+        // downloads it once from the fork voice-to-text settings) and is
+        // capped at 20 minutes of audio.
+        if (!engine.isCloud()) {
+            if (!WhisperModel.isDownloaded()) {
+                AndroidUtilities.runOnUIThread(() -> callback.onError(ERROR_MODEL_NOT_DOWNLOADED, null));
+                return;
+            }
+            if (duration > MAX_ONDEVICE_DURATION_SECONDS) {
+                AndroidUtilities.runOnUIThread(() -> callback.onError(ERROR_TOO_LONG, null));
+                return;
+            }
+        }
         transcribeQueue.postRunnable(() -> {
             if (!pruned) {
                 pruned = true;

@@ -13,11 +13,10 @@
  * fork's own engines:
  *  - OpenAI Whisper API (cloud, the voice file is uploaded as-is),
  *  - Google Cloud Speech-to-Text (cloud, the voice file is sent as
- *    base64 OGG_OPUS).
- * An on-device engine (whisper.cpp via JNI) can be added later behind this
- * same interface without any UI changes: it would return isCloud() ==
- * false, at which point the controller's secret-chat policy changes from
- * "refuse" to "allow", exactly like ML Kit in Feature 2.
+ *    base64 OGG_OPUS),
+ *  - On-device Whisper (whisper.cpp via JNI, fully offline; returns
+ *    isCloud() == false, so the controller's secret-chat policy is
+ *    "allow" for it, exactly like ML Kit in Feature 2).
  * API keys are the user's own, read from SharedConfig, and are never
  * logged or included in error messages.
  */
@@ -45,6 +44,7 @@ public abstract class ForkSttEngine {
     // Stable engine ids, also used as the engine column of the transcription cache.
     public static final String ID_OPENAI = "openai";
     public static final String ID_GOOGLE = "google";
+    public static final String ID_ONDEVICE = "ondevice";
 
     public abstract String getId();
 
@@ -64,9 +64,18 @@ public abstract class ForkSttEngine {
                 return new OpenAiWhisperEngine();
             case SharedConfig.FORK_STT_ENGINE_GOOGLE:
                 return new GoogleSttEngine();
+            case SharedConfig.FORK_STT_ENGINE_ONDEVICE:
+                return new OnDeviceWhisperEngine();
             default:
                 return null;
         }
+    }
+
+    // Whether the given engine id sends audio to a cloud service. Only
+    // the on-device engine is not cloud; unknown ids are treated as
+    // cloud (the safe default for the privacy gates that use this).
+    public static boolean isCloudEngine(int engine) {
+        return engine != SharedConfig.FORK_STT_ENGINE_ONDEVICE;
     }
 
     public static String keyForEngine(int engine) {

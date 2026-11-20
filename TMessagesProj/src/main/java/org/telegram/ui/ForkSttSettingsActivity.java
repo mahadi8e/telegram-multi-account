@@ -7,12 +7,13 @@
  *
  * TG fork: settings screen for the fork voice-to-text engines
  * (Feature 3), modelled on ForkTranslateSettingsActivity. Holds the
- * feature's master switch (off by default — the v1 engines are cloud
- * services), the engine picker (OpenAI Whisper / Google Cloud
- * Speech-to-Text) and the user's own API keys. Selecting an engine asks
- * for the one-time privacy consent first. The stock Telegram
- * transcription and its Premium gates are not represented here and are
- * not affected by anything on this screen.
+ * feature's master switch (off by default), the engine picker
+ * (on-device Whisper / OpenAI Whisper / Google Cloud Speech-to-Text),
+ * the on-device model download/delete row and the user's own API keys
+ * for the cloud engines. Selecting a cloud engine asks for the
+ * one-time privacy consent first; the on-device engine needs none.
+ * The stock Telegram transcription and its Premium gates are not
+ * represented here and are not affected by anything on this screen.
  */
 
 package org.telegram.ui;
@@ -29,9 +30,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ForkSttEngine;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.Utilities;
+import org.telegram.messenger.WhisperModel;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -58,12 +62,14 @@ public class ForkSttSettingsActivity extends BaseFragment {
     private static final int VIEW_TYPE_VALUE = 4;
     private static final int VIEW_TYPE_SHADOW = 5;
 
-    private static final int ROW_COUNT = 10;
+    private static final int ROW_COUNT = 12;
     private static final int ROW_ENGINE_START = 3;
-    private static final int ROW_OPENAI_KEY = 7;
-    private static final int ROW_GOOGLE_KEY = 8;
+    private static final int ROW_MODEL = 6;
+    private static final int ROW_OPENAI_KEY = 9;
+    private static final int ROW_GOOGLE_KEY = 10;
 
     private static final int[] ENGINE_ORDER = new int[]{
+            SharedConfig.FORK_STT_ENGINE_ONDEVICE,
             SharedConfig.FORK_STT_ENGINE_OPENAI,
             SharedConfig.FORK_STT_ENGINE_GOOGLE
     };
@@ -116,6 +122,8 @@ public class ForkSttSettingsActivity extends BaseFragment {
                 }
             } else if (viewType == VIEW_TYPE_ENGINE) {
                 selectEngine(ENGINE_ORDER[position - ROW_ENGINE_START]);
+            } else if (position == ROW_MODEL) {
+                onModelRowClicked();
             } else if (position == ROW_OPENAI_KEY) {
                 showApiKeyDialog(true);
             } else if (position == ROW_GOOGLE_KEY) {
@@ -148,10 +156,11 @@ public class ForkSttSettingsActivity extends BaseFragment {
         if (engine == SharedConfig.forkSttEngine) {
             return;
         }
-        // TG fork privacy rule: both v1 engines are cloud services, so
-        // choosing one asks for the one-time notice first (it is also
-        // asked before the first actual transcription, in ChatActivity).
-        if (!SharedConfig.forkSttCloudConsent) {
+        // TG fork privacy rule: choosing a cloud engine asks for the
+        // one-time notice first (it is also asked before the first
+        // actual transcription, in ChatActivity). The on-device engine
+        // sends nothing anywhere, so it needs no consent.
+        if (ForkSttEngine.isCloudEngine(engine) && !SharedConfig.forkSttCloudConsent) {
             if (getParentActivity() == null) {
                 return;
             }
@@ -173,6 +182,57 @@ public class ForkSttSettingsActivity extends BaseFragment {
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
+    }
+
+    // TG fork: the on-device engine's model row — downloads the Whisper
+    // model on first use (with a spinner dialog; the download itself is
+    // verified by WhisperModel) and offers to delete it afterwards.
+    private void onModelRowClicked() {
+        if (getParentActivity() == null || WhisperModel.isDownloading()) {
+            return;
+        }
+        if (WhisperModel.isDownloaded()) {
+            showDialog(new AlertDialog.Builder(getParentActivity())
+                    .setTitle(LocaleController.getString(R.string.ForkSttModelDeleteTitle))
+                    .setMessage(LocaleController.getString(R.string.ForkSttModelDeleteMessage))
+                    .setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
+                        WhisperModel.delete();
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                    })
+                    .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                    .create());
+            return;
+        }
+        final AlertDialog progressDialog = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER, getResourceProvider());
+        progressDialog.setMessage(LocaleController.getString(R.string.ForkSttModelDownloading));
+        showDialog(progressDialog);
+        Utilities.globalQueue.postRunnable(() -> WhisperModel.download(new WhisperModel.DownloadCallback() {
+            @Override
+            public void onProgress(long downloaded, long total) {
+            }
+
+            @Override
+            public void onDone(boolean success) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    try {
+                        progressDialog.dismiss();
+                    } catch (Exception ignore) {
+                    }
+                    if (adapter != null) {
+                        adapter.notifyDataSetChanged();
+                    }
+                    if (!success && getParentActivity() != null) {
+                        showDialog(new AlertDialog.Builder(getParentActivity())
+                                .setTitle(LocaleController.getString(R.string.ForkSttModel))
+                                .setMessage(LocaleController.getString(R.string.ForkSttModelDownloadFailed))
+                                .setPositiveButton(LocaleController.getString(R.string.OK), null)
+                                .create());
+                    }
+                });
+            }
+        }));
     }
 
     private void showApiKeyDialog(boolean openai) {
@@ -227,6 +287,8 @@ public class ForkSttSettingsActivity extends BaseFragment {
         switch (engine) {
             case SharedConfig.FORK_STT_ENGINE_GOOGLE:
                 return R.string.ForkSttEngineGoogle;
+            case SharedConfig.FORK_STT_ENGINE_ONDEVICE:
+                return R.string.ForkSttEngineOnDevice;
             default:
                 return R.string.ForkSttEngineOpenAi;
         }
@@ -251,13 +313,14 @@ public class ForkSttSettingsActivity extends BaseFragment {
                 case 0:
                     return VIEW_TYPE_CHECK;
                 case 1:
-                case 9:
+                case 11:
                     return VIEW_TYPE_HINT;
                 case 2:
-                case 6:
+                case 8:
                     return VIEW_TYPE_HEADER;
-                case 5:
+                case 7:
                     return VIEW_TYPE_SHADOW;
+                case ROW_MODEL:
                 case ROW_OPENAI_KEY:
                 case ROW_GOOGLE_KEY:
                     return VIEW_TYPE_VALUE;
@@ -331,7 +394,9 @@ public class ForkSttSettingsActivity extends BaseFragment {
                 }
                 case VIEW_TYPE_VALUE: {
                     TextSettingsCell cell = (TextSettingsCell) holder.itemView;
-                    if (position == ROW_OPENAI_KEY) {
+                    if (position == ROW_MODEL) {
+                        cell.setTextAndValue(LocaleController.getString(R.string.ForkSttModel), WhisperModel.isDownloading() ? LocaleController.getString(R.string.ForkSttModelDownloading) : WhisperModel.isDownloaded() ? AndroidUtilities.formatFileSize(WhisperModel.getModelFile().length()) : LocaleController.getString(R.string.ForkSttModelNotDownloaded), true);
+                    } else if (position == ROW_OPENAI_KEY) {
                         cell.setTextAndValue(LocaleController.getString(R.string.ForkSttOpenAiKey), keyValue(SharedConfig.forkSttOpenAiKey), true);
                     } else {
                         cell.setTextAndValue(LocaleController.getString(R.string.ForkSttGoogleKey), keyValue(SharedConfig.forkSttGoogleKey), false);
