@@ -134,6 +134,7 @@ public class LocalFilterCreateActivity extends BaseFragment {
 
         listView = new RecyclerListView(context);
         listView.setSections(true);
+        ForkUi.addFirstRowTopGap(listView);
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
         listView.setSectionsDrawBackground(true);
