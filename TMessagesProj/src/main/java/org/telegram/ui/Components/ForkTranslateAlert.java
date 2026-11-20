@@ -32,7 +32,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class ForkTranslateAlert {
 
-    private final BottomSheet sheet;
+    private BottomSheet sheet;
     private final TextView statusView;
     private final TextView translatedView;
     private final TextView originalView;
