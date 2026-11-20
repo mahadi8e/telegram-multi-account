@@ -46915,16 +46915,6 @@ public class ChatActivity extends BaseFragment implements
                     icons.add(R.drawable.menu_gift);
                 }
             }
-            // TG fork: fork voice-to-text entry point (Feature 3). Shown only
-            // for voice messages while the feature is enabled; secret chats
-            // are excluded only for cloud engines (the on-device engine
-            // never sends audio anywhere, so it is allowed there). The
-            // stock transcribe button and its Premium flow are untouched.
-            if (SharedConfig.forkSttEnabled && selectedObject != null && selectedObject.isVoice() && (!DialogObject.isEncryptedDialog(dialog_id) || !ForkSttEngine.isCloudEngine(SharedConfig.forkSttEngine))) {
-                items.add(LocaleController.getString(R.string.ForkSttTranscribe));
-                options.add(OPTION_FORK_TRANSCRIBE);
-                icons.add(R.drawable.msg_message);
-            }
             if (message.canDeleteMessage(chatMode == MODE_SCHEDULED, currentChat) && (threadMessageObjects == null || !threadMessageObjects.contains(message)) && !(message != null && message.messageOwner != null && message.messageOwner.action instanceof TLRPC.TL_messageActionTopicCreate)) {
                 items.add(LocaleController.getString(chatMode == MODE_SAVED && threadMessageId != getUserConfig().getClientUserId() ? R.string.Remove : R.string.Delete));
                 options.add(OPTION_DELETE);
@@ -46989,6 +46979,16 @@ public class ChatActivity extends BaseFragment implements
                     options.add(OPTION_VIEW_IN_TOPIC);
                     icons.add(R.drawable.msg_viewintopic);
                 }
+            // TG fork: fork voice-to-text entry point (Feature 3). Shown only
+            // for voice messages while the feature is enabled; secret chats
+            // are excluded only for cloud engines (the on-device engine
+            // never sends audio anywhere, so it is allowed there). The
+            // stock transcribe button and its Premium flow are untouched.
+            if (SharedConfig.forkSttEnabled && selectedObject != null && selectedObject.isVoice() && (!DialogObject.isEncryptedDialog(dialog_id) || !ForkSttEngine.isCloudEngine(SharedConfig.forkSttEngine))) {
+                items.add(LocaleController.getString(R.string.ForkSttTranscribe));
+                options.add(OPTION_FORK_TRANSCRIBE);
+                icons.add(R.drawable.msg_message);
+            }
                 if (type == 2) {
                     if (chatMode != MODE_SCHEDULED) {
 
