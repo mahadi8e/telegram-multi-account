@@ -4302,6 +4302,7 @@ public class ChatActivity extends BaseFragment implements
                 @Override
                 public void onShowSubMenu() {
                     updateScrimSourceBitmap();
+                    updateForkAutoTranslateItem();
                 }
 
                 @Override
@@ -4433,7 +4434,10 @@ public class ChatActivity extends BaseFragment implements
             // and opens the engine picker \u2014 previously the item silently
             // never appeared in that state and the feature looked missing.
             if (SharedConfig.forkTranslateEnabled) {
-                forkAutoTranslateItem = headerItem.lazilyAddSubItem(fork_auto_translate, R.drawable.msg_translate, LocaleController.getString(R.string.ForkAutoTranslate));
+                // needCheck: the item carries a checkbox showing whether
+                // whole-chat translation is on for this chat \u2014 without it
+                // the user could not tell the state (user report).
+                forkAutoTranslateItem = headerItem.lazilyAddSubItem(fork_auto_translate, R.drawable.msg_translate, null, LocaleController.getString(R.string.ForkAutoTranslate), true, true);
             }
             // TG fork: deleted-message retention (Feature 5). Offered only
             // when the feature is globally on; secret chats and Saved
@@ -11834,8 +11838,23 @@ public class ChatActivity extends BaseFragment implements
         }
         controller.setAutoTranslateDialog(getDialogId(), enable, TranslateAlert2.getToLanguage());
         BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(enable ? R.string.ForkAutoTranslateOn : R.string.ForkAutoTranslateOff)).show();
+        updateForkAutoTranslateItem();
         if (enable) {
             controller.translateMessagesIfNeeded(getDialogId(), new ArrayList<>(messages));
+        }
+    }
+
+    // TG fork: shows the current per-chat auto-translate state as the
+    // checkmark of the "Translate entire chat" header-menu item. Called
+    // every time the menu opens (onShowSubMenu, after the lazy items are
+    // laid out, so the item's view exists) and right after toggling.
+    private void updateForkAutoTranslateItem() {
+        if (forkAutoTranslateItem == null) {
+            return;
+        }
+        View view = forkAutoTranslateItem.getView();
+        if (view instanceof ActionBarMenuSubItem) {
+            ((ActionBarMenuSubItem) view).setChecked(ForkTranslateController.getInstance(currentAccount).isAutoTranslateDialog(getDialogId()));
         }
     }
 
