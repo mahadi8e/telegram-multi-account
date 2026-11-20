@@ -3519,7 +3519,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         return count;
     }
 
-    @Override
     // TG fork: the compression preset shared by the current selection
     // (Feature 4). Entries that were never touched fall back to the
     // SharedConfig default, exactly like the row displays it.
