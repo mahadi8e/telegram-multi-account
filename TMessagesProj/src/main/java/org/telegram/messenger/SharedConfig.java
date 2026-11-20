@@ -207,6 +207,14 @@ public class SharedConfig {
                 .apply();
     }
 
+    public static void setForkSttWhisperModel(int value) {
+        forkSttWhisperModel = value;
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
+                .edit()
+                .putInt("forkSttWhisperModel", value)
+                .apply();
+    }
+
     public static void setForkSttOpenAiKey(String value) {
         forkSttOpenAiKey = value == null ? "" : value;
         ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE)
@@ -443,8 +451,15 @@ public class SharedConfig {
     public static final int FORK_STT_ENGINE_OPENAI = 0;
     public static final int FORK_STT_ENGINE_GOOGLE = 1;
     public static final int FORK_STT_ENGINE_ONDEVICE = 2;
+    // TG fork: selectable Whisper model sizes for the on-device engine
+    // (Feature 3 follow-up). These index WhisperModel's catalog; Base
+    // is the size the engine originally shipped with.
+    public static final int FORK_STT_MODEL_TINY = 0;
+    public static final int FORK_STT_MODEL_BASE = 1;
+    public static final int FORK_STT_MODEL_SMALL = 2;
     public static boolean forkSttEnabled = false;
     public static int forkSttEngine = FORK_STT_ENGINE_ONDEVICE;
+    public static int forkSttWhisperModel = FORK_STT_MODEL_BASE;
     public static String forkSttOpenAiKey = "";
     public static String forkSttGoogleKey = "";
     public static boolean forkSttCloudConsent = false;
@@ -912,6 +927,7 @@ public class SharedConfig {
             // TG fork: voice-to-text engine settings (Feature 3); off by default
             forkSttEnabled = preferences.getBoolean("forkSttEnabled", false);
             forkSttEngine = preferences.getInt("forkSttEngine", FORK_STT_ENGINE_ONDEVICE);
+            forkSttWhisperModel = preferences.getInt("forkSttWhisperModel", FORK_STT_MODEL_BASE);
             forkSttOpenAiKey = preferences.getString("forkSttOpenAiKey", "");
             forkSttGoogleKey = preferences.getString("forkSttGoogleKey", "");
             forkSttCloudConsent = preferences.getBoolean("forkSttCloudConsent", false);

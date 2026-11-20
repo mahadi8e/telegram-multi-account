@@ -127,7 +127,7 @@ public class ForkTranscribeController extends BaseController {
         // downloads it once from the fork voice-to-text settings) and is
         // capped at 20 minutes of audio.
         if (!engine.isCloud()) {
-            if (!WhisperModel.isDownloaded()) {
+            if (!WhisperModel.isSelectedDownloaded()) {
                 AndroidUtilities.runOnUIThread(() -> callback.onError(ERROR_MODEL_NOT_DOWNLOADED, null));
                 return;
             }
@@ -141,7 +141,11 @@ public class ForkTranscribeController extends BaseController {
                 pruned = true;
                 storage.pruneOldTranscriptions();
             }
-            TranscriptionsStorage.Entry cached = storage.getTranscription(dialogId, messageId, engine.getId());
+            // TG fork: on-device results are cached per model size — a
+            // transcript made by the Base model must not be served when
+            // the user has switched to Small expecting better quality.
+            final String cacheEngineId = engine.isCloud() ? engine.getId() : engine.getId() + ":m" + WhisperModel.getSelectedModel();
+            TranscriptionsStorage.Entry cached = storage.getTranscription(dialogId, messageId, cacheEngineId);
             if (cached != null) {
                 AndroidUtilities.runOnUIThread(() -> callback.onSuccess(cached.text, cached.language));
                 return;
@@ -166,7 +170,7 @@ public class ForkTranscribeController extends BaseController {
             engine.transcribe(file, null, new ForkSttEngine.Callback() {
                 @Override
                 public void onSuccess(String text, String detectedLanguage) {
-                    storage.putTranscription(dialogId, messageId, engine.getId(), detectedLanguage, text, duration, System.currentTimeMillis());
+                    storage.putTranscription(dialogId, messageId, cacheEngineId, detectedLanguage, text, duration, System.currentTimeMillis());
                     AndroidUtilities.runOnUIThread(() -> callback.onSuccess(text, detectedLanguage));
                 }
 

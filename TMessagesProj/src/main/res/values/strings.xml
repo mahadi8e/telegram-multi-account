@@ -3183,6 +3183,12 @@
     <string name="ForkSttModelDeleteMessage">Delete the downloaded on-device speech model? You can download it again later.</string>
     <string name="ForkSttModelMissing">The on-device speech model is not downloaded yet. Open Settings, Voice-to-Text (fork), and download it first.</string>
     <string name="ForkSttTooLong">This voice message is too long for on-device transcription (maximum 20 minutes).</string>
+    <string name="ForkSttModelTiny">Tiny</string>
+    <string name="ForkSttModelBase">Base</string>
+    <string name="ForkSttModelSmall">Small</string>
+    <string name="ForkSttModelDownloadedWord">Downloaded</string>
+    <string name="ForkSttModelNotDownloadedWord">Not downloaded</string>
+    <string name="ForkSttModelsHint">Tiny is the fastest but the weakest, especially for Bengali. Base is balanced and recommended for most voice messages. Small understands Bengali best, but is about 3 times slower than Base. Tap a model to download it or switch to it; tap the model in use to delete it.</string>
     <string name="ForkSttApiKeysHeader">API keys</string>
     <string name="ForkSttOpenAiKey">OpenAI API key</string>
     <string name="ForkSttGoogleKey">Google Cloud API key</string>

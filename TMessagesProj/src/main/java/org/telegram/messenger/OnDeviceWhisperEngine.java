@@ -47,6 +47,7 @@ public class OnDeviceWhisperEngine extends ForkSttEngine {
 
     private static final Object LOCK = new Object();
     private static long nativeContext = 0;
+    private static String loadedModelPath;
 
     @Override
     public String getId() {
@@ -62,7 +63,7 @@ public class OnDeviceWhisperEngine extends ForkSttEngine {
     public void transcribe(File audioFile, String languageHint, Callback callback) {
         synchronized (LOCK) {
             try {
-                if (!WhisperModel.isDownloaded()) {
+                if (!WhisperModel.isSelectedDownloaded()) {
                     callback.onError("on-device model is not downloaded");
                     return;
                 }
@@ -71,12 +72,25 @@ public class OnDeviceWhisperEngine extends ForkSttEngine {
                     callback.onError("could not decode the voice message on this device");
                     return;
                 }
-                if (nativeContext == 0) {
-                    nativeContext = nativeInit(WhisperModel.getModelFile().getAbsolutePath());
+                // TG fork: the native context is bound to one model
+                // file. When the user picks another model size in the
+                // settings, free the old context and load the new one.
+                File modelFile = WhisperModel.getSelectedModelFile();
+                if (nativeContext == 0 || !modelFile.getAbsolutePath().equals(loadedModelPath)) {
+                    if (nativeContext != 0) {
+                        try {
+                            nativeFree(nativeContext);
+                        } catch (Throwable ignore) {
+                        }
+                        nativeContext = 0;
+                        loadedModelPath = null;
+                    }
+                    nativeContext = nativeInit(modelFile.getAbsolutePath());
                     if (nativeContext == 0) {
                         callback.onError("could not load the on-device model");
                         return;
                     }
+                    loadedModelPath = modelFile.getAbsolutePath();
                 }
                 int threads = Math.min(4, Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
                 String text = nativeTranscribe(nativeContext, pcm, languageHint, threads);
