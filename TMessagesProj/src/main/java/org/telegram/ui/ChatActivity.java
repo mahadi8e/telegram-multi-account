@@ -11874,6 +11874,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                 })
                 .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .setOnPreDismissListener(di -> dimBehindView(false))
                 .create());
     }
 
@@ -11935,6 +11936,7 @@ public class ChatActivity extends BaseFragment implements
                         .setTitle(LocaleController.getString(R.string.ForkTranslateCloudNoticeTitle))
                         .setMessage(LocaleController.getString(R.string.ForkTranslateSecretChatCloudBlocked))
                         .setPositiveButton(LocaleController.getString(R.string.OK), null)
+                        .setOnPreDismissListener(di -> dimBehindView(false))
                         .create());
                 return;
             }
@@ -11944,6 +11946,14 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         final ForkTranslateAlert alert = ForkTranslateAlert.show(getParentActivity(), getResourceProvider(), ForkTranslateAlert.getEngineName(engine), text.toString());
+        // TG fork fix: the message menu was closed with closeMenu(false),
+        // which keeps the menu scrim (dimBehindView) active \u2014 and while
+        // the scrim is active, ChatActivityContentView.dispatchTouchEvent
+        // drops every touch. The stock TranslateAlert2 flow releases the
+        // scrim through its dismiss callback; the fork sheet must do the
+        // same, otherwise closing this sheet leaves the chat touch-dead
+        // (user report, with video).
+        alert.setOnDismissListener(() -> dimBehindView(false));
         ForkTranslateController.getInstance(currentAccount).translateText(getDialogId(), messageObject.getId(), text.toString(), toLanguage, new ForkTranslateController.Callback() {
             @Override
             public void onSuccess(String translatedText, String detectedFromLanguage) {

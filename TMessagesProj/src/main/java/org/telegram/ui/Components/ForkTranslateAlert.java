@@ -135,6 +135,13 @@ public class ForkTranslateAlert {
         return sheet.isShowing();
     }
 
+    // TG fork: lets the caller run cleanup when the sheet goes away.
+    // ChatActivity uses this to release the message-menu scrim (see
+    // showForkTranslation) \u2014 without it the chat stays touch-dead.
+    public void setOnDismissListener(Runnable onDismiss) {
+        sheet.setOnDismissListener(onDismiss);
+    }
+
     public void setResult(String text) {
         if (!sheet.isShowing()) {
             return;
