@@ -4424,10 +4424,15 @@ public class ChatActivity extends BaseFragment implements
             }
             translateItem = headerItem.lazilyAddSubItem(translate, R.drawable.msg_translate, LocaleController.getString(R.string.TranslateMessage));
             updateTranslateItemVisibility();
-            // TG fork: per-chat auto-translate toggle running on the fork engine
-            // (Feature 2). It has its own label and its own persisted dialog set;
-            // the stock translate item above and its Premium gate are untouched.
-            if (SharedConfig.isForkTranslateEngineSelected()) {
+            // TG fork: "Translate entire chat" toggle running on the fork
+            // engine (Feature 2). It has its own label and its own persisted
+            // dialog set; the stock translate item above and its Premium gate
+            // are untouched. The item is added whenever the fork translation
+            // feature is on: with the Telegram (server) engine selected it
+            // cannot run, and toggleForkAutoTranslate() then explains that
+            // and opens the engine picker \u2014 previously the item silently
+            // never appeared in that state and the feature looked missing.
+            if (SharedConfig.forkTranslateEnabled) {
                 forkAutoTranslateItem = headerItem.lazilyAddSubItem(fork_auto_translate, R.drawable.msg_translate, LocaleController.getString(R.string.ForkAutoTranslate));
             }
             // TG fork: deleted-message retention (Feature 5). Offered only
@@ -11802,6 +11807,20 @@ public class ChatActivity extends BaseFragment implements
     // nothing here touches the stock TranslateController or its Premium gate.
     private void toggleForkAutoTranslate() {
         final ForkTranslateController controller = ForkTranslateController.getInstance(currentAccount);
+        // TG fork UI fix: with the Telegram (server) engine selected,
+        // whole-chat translation is the Premium feature and the fork
+        // controller refuses to run. Explain that and take the user to the
+        // engine picker instead of silently doing nothing. Turning the
+        // toggle OFF for this chat stays possible in any engine state.
+        if (SharedConfig.forkTranslateEngine == SharedConfig.FORK_TRANSLATE_ENGINE_TELEGRAM && !controller.isAutoTranslateDialog(getDialogId())) {
+            showDialog(new AlertDialog.Builder(getParentActivity())
+                    .setTitle(LocaleController.getString(R.string.ForkAutoTranslate))
+                    .setMessage(LocaleController.getString(R.string.ForkTranslateEntireChatNeedsEngine))
+                    .setPositiveButton(LocaleController.getString(R.string.Settings), (dialog, which) -> presentFragment(new ForkTranslateSettingsActivity()))
+                    .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                    .create());
+            return;
+        }
         final boolean enable = !controller.isAutoTranslateDialog(getDialogId());
         if (enable && SharedConfig.isForkCloudEngine(SharedConfig.forkTranslateEngine)) {
             if (DialogObject.isEncryptedDialog(getDialogId())) {

@@ -99,8 +99,10 @@ public class ForkDownloadSettingsActivity extends BaseFragment {
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
+        listView.setSections();
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
+        listView.setSectionsDrawBackground(true);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setAdapter(adapter = new ListAdapter(context));
         listView.setOnItemClickListener((view, position, x, y) -> {
@@ -128,6 +130,16 @@ public class ForkDownloadSettingsActivity extends BaseFragment {
 
         buildRows();
         return fragmentView;
+    }
+
+    // TG fork UI fix: returning the list here lets BaseFragment apply the
+    // simple-glass insets (status bar + action bar) as list padding, like
+    // every stock settings screen. Without it the list slides under the
+    // status bar. setSections()/setSectionsDrawBackground() above give the
+    // rows Telegram's rounded section cards over the gray page background.
+    @Override
+    protected RecyclerListView getListViewForSimpleGlass() {
+        return listView;
     }
 
     @Override

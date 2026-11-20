@@ -18,13 +18,16 @@ package org.telegram.ui;
 
 import android.content.Context;
 import android.text.InputType;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -32,6 +35,7 @@ import org.telegram.messenger.TranslateController;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextCell;
@@ -103,8 +107,10 @@ public class ForkTranslateSettingsActivity extends BaseFragment {
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
+        listView.setSections();
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
+        listView.setSectionsDrawBackground(true);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setAdapter(adapter = new ListAdapter(context));
         listView.setOnItemClickListener((view, position, x, y) -> {
@@ -131,6 +137,16 @@ public class ForkTranslateSettingsActivity extends BaseFragment {
         });
 
         return fragmentView;
+    }
+
+    // TG fork UI fix: returning the list here lets BaseFragment apply the
+    // simple-glass insets (status bar + action bar) as list padding, like
+    // every stock settings screen. Without it the list slides under the
+    // status bar. setSections()/setSectionsDrawBackground() above give the
+    // rows Telegram's rounded section cards over the gray page background.
+    @Override
+    protected RecyclerListView getListViewForSimpleGlass() {
+        return listView;
     }
 
     @Override
@@ -176,26 +192,48 @@ public class ForkTranslateSettingsActivity extends BaseFragment {
         if (getParentActivity() == null) {
             return;
         }
+        // TG fork UI fix: the bare EditText used to be passed straight to
+        // the dialog \u2014 no padding and no background, so it was not even
+        // recognizable as a text box. Style it like the stock text-input
+        // alerts (AlertsCreator.createSimpleTextInputAlert): a padded field
+        // with a rounded filled background inside a margined container,
+        // capped dialog width, focus + keyboard on show.
         EditTextBoldCursor editText = new EditTextBoldCursor(getParentActivity());
+        editText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        editText.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        editText.setHintTextColor(getThemedColor(Theme.key_groupcreate_hintText));
+        editText.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(11), AndroidUtilities.dp(16), AndroidUtilities.dp(11));
+        editText.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(22), Theme.multAlpha(getThemedColor(Theme.key_dialogTextBlack), 0.06f)));
         editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         editText.setText(google ? SharedConfig.forkTranslateGoogleKey : SharedConfig.forkTranslateDeeplKey);
         editText.setSelection(editText.getText().length());
-        showDialog(new AlertDialog.Builder(getParentActivity())
-                .setTitle(LocaleController.getString(google ? R.string.ForkTranslateGoogleKey : R.string.ForkTranslateDeeplKey))
-                .setView(editText)
-                .setPositiveButton(LocaleController.getString(R.string.Save), (dialog, which) -> {
-                    String value = editText.getText() == null ? "" : editText.getText().toString().trim();
-                    if (google) {
-                        SharedConfig.setForkTranslateGoogleKey(value);
-                    } else {
-                        SharedConfig.setForkTranslateDeeplKey(value);
-                    }
-                    if (adapter != null) {
-                        adapter.notifyDataSetChanged();
-                    }
-                })
-                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
-                .create());
+
+        LinearLayout container = new LinearLayout(getParentActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.addView(editText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 20, 9, 20, 9));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(LocaleController.getString(google ? R.string.ForkTranslateGoogleKey : R.string.ForkTranslateDeeplKey));
+        builder.setView(container);
+        builder.setWidth(Math.min(AndroidUtilities.dp(320), AndroidUtilities.displaySize.x * 85 / 100));
+        builder.setPositiveButton(LocaleController.getString(R.string.Save), (dialog, which) -> {
+            String value = editText.getText() == null ? "" : editText.getText().toString().trim();
+            if (google) {
+                SharedConfig.setForkTranslateGoogleKey(value);
+            } else {
+                SharedConfig.setForkTranslateDeeplKey(value);
+            }
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(d -> {
+            editText.requestFocus();
+            AndroidUtilities.showKeyboard(editText);
+        });
+        showDialog(dialog);
     }
 
     // Target language reuses the stock storage and locale list: the value is

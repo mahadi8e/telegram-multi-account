@@ -112,6 +112,12 @@ public class LocalFilterCreateActivity extends BaseFragment {
         LinearLayout linearLayout = new LinearLayout(context);
         linearLayout.setOrientation(LinearLayout.VERTICAL);
         fragmentView = linearLayout;
+        // TG fork UI fix: this screen's root is a LinearLayout, so the
+        // simple-glass list handling in BaseFragment (which requires a
+        // FrameLayout root) cannot inset it. Pad the top manually by the
+        // status-bar inset + action bar height so the name field does not
+        // slide under the status bar.
+        linearLayout.setPadding(0, mSystemInsets.top + ActionBar.getCurrentActionBarHeight(), 0, 0);
 
         nameEditText = new EditText(context);
         nameEditText.setTextSize(16);
@@ -127,8 +133,10 @@ public class LocalFilterCreateActivity extends BaseFragment {
         linearLayout.addView(nameEditText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 54, 0, 0, 0, 0));
 
         listView = new RecyclerListView(context);
+        listView.setSections();
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
+        listView.setSectionsDrawBackground(true);
         linearLayout.addView(listView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 0, 1.0f));
         listView.setAdapter(adapter = new ListAdapter(context));
         listView.setOnItemClickListener((view, position, x, y) -> {
