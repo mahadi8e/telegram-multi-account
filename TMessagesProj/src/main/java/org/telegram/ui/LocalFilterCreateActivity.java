@@ -133,7 +133,7 @@ public class LocalFilterCreateActivity extends BaseFragment {
         linearLayout.addView(nameEditText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 54, 0, 0, 0, 0));
 
         listView = new RecyclerListView(context);
-        listView.setSections();
+        listView.setSections(true);
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
         listView.setSectionsDrawBackground(true);

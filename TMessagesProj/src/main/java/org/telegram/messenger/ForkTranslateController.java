@@ -153,6 +153,14 @@ public class ForkTranslateController extends BaseController {
         return autoDialogs.containsKey(dialogId);
     }
 
+    // Target language stored for an auto-translate dialog, or null when the
+    // fork toggle is off for it. MessageObject.generateCaption() uses this
+    // to decide whether a stored translatedText is a live fork translation.
+    public synchronized String getAutoTranslateLanguage(long dialogId) {
+        ensureAutoLoaded();
+        return autoDialogs.get(dialogId);
+    }
+
     public synchronized void setAutoTranslateDialog(long dialogId, boolean enabled, String toLanguage) {
         ensureAutoLoaded();
         if (enabled) {

@@ -7854,8 +7854,21 @@ public class MessageObject {
     public void generateCaption() {
         if (isRoundVideo()) return;
         final boolean hideLinks = shouldHideLinks();
+        // TG fork (Feature 2): whole-chat auto-translate stores its result
+        // in messageOwner.translatedText but deliberately does not set the
+        // stock `translated` flag \u2014 updateTranslation() would clear it
+        // again, because the stock controller is not translating this
+        // dialog. Treat the caption as translated while the fork toggle is
+        // on for this dialog and the stored translation is in the fork's
+        // target language for it. Without this, media captions never showed
+        // the fork translation (only plain text bubbles did, via
+        // applyNewText swapping messageText directly).
+        final String forkAutoLanguage = ForkTranslateController.getInstance(currentAccount).getAutoTranslateLanguage(getDialogId());
+        final boolean forkCaptionTranslated = !translated && forkAutoLanguage != null && messageOwner.translatedText != null
+            && TextUtils.equals(forkAutoLanguage, messageOwner.translatedToLanguage);
+        final boolean captionTranslatedState = translated || forkCaptionTranslated;
         if (caption != null &&
-            (translated && (messageOwner.translatedText != null || summarized && messageOwner.translatedSummaryText != null)) == captionTranslated &&
+            (captionTranslatedState && (messageOwner.translatedText != null || summarized && messageOwner.translatedSummaryText != null)) == captionTranslated &&
             summarized == captionSummarized &&
             hideLinks == captionLinksHidden
         ) {
@@ -7887,7 +7900,7 @@ public class MessageObject {
             captionTranslated = false;
             text = messageOwner.summaryText.text;
             entities = messageOwner.summaryText.entities;
-        } else if (messageOwner.translatedText != null && translated) {
+        } else if (messageOwner.translatedText != null && captionTranslatedState) {
             captionSummarized = false;
             captionTranslated = true;
             text = messageOwner.translatedText.text;
