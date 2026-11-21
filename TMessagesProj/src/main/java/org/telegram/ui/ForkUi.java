@@ -29,7 +29,7 @@ public class ForkUi {
             @Override
             public void getItemOffsets(@NonNull Rect outRect, @NonNull View view, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
                 if (parent.getChildAdapterPosition(view) == 0) {
-                    outRect.top += AndroidUtilities.dp(20);
+                    outRect.top += AndroidUtilities.dp(28);
                 }
             }
         });
