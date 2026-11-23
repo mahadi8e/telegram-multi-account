@@ -194,38 +194,32 @@ public class ForkSttSettingsActivity extends BaseFragment {
 
     // TG fork: one row per Whisper model size (Feature 3 follow-up).
     // Tapping an undownloaded model downloads it (WhisperModel verifies
-    // size + magic) and selects it on success; tapping a downloaded one
-    // selects it; tapping the model already in use offers to delete it.
+    // size + magic) and selects it on success. Tapping a downloaded one
+    // opens an options dialog — "Use this model" (unless it already is
+    // the one in use) and "Delete model" — so any downloaded model can
+    // be deleted, not only the one currently selected.
     private void onModelRowClicked(final int model) {
         if (getParentActivity() == null || WhisperModel.isDownloading()) {
             return;
         }
         if (WhisperModel.isDownloaded(model)) {
-            if (model != SharedConfig.forkSttWhisperModel) {
-                SharedConfig.setForkSttWhisperModel(model);
-                if (adapter != null) {
-                    adapter.notifyDataSetChanged();
-                }
-                return;
+            final boolean inUse = model == SharedConfig.forkSttWhisperModel;
+            CharSequence[] items;
+            if (inUse) {
+                items = new CharSequence[]{LocaleController.getString(R.string.ForkSttModelDeleteTitle)};
+            } else {
+                items = new CharSequence[]{LocaleController.getString(R.string.ForkSttModelUse), LocaleController.getString(R.string.ForkSttModelDeleteTitle)};
             }
             showDialog(new AlertDialog.Builder(getParentActivity())
-                    .setTitle(LocaleController.getString(R.string.ForkSttModelDeleteTitle))
-                    .setMessage(LocaleController.getString(R.string.ForkSttModelDeleteMessage))
-                    .setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
-                        WhisperModel.delete(model);
-                        // If the model in use was just deleted, fall
-                        // back to another downloaded model if any.
-                        if (!WhisperModel.isSelectedDownloaded()) {
-                            int[] fallbackOrder = new int[]{SharedConfig.FORK_STT_MODEL_BASE, SharedConfig.FORK_STT_MODEL_TINY, SharedConfig.FORK_STT_MODEL_SMALL};
-                            for (int candidate : fallbackOrder) {
-                                if (WhisperModel.isDownloaded(candidate)) {
-                                    SharedConfig.setForkSttWhisperModel(candidate);
-                                    break;
-                                }
+                    .setTitle(modelRowText(model))
+                    .setItems(items, (dialog, which) -> {
+                        if (!inUse && which == 0) {
+                            SharedConfig.setForkSttWhisperModel(model);
+                            if (adapter != null) {
+                                adapter.notifyDataSetChanged();
                             }
-                        }
-                        if (adapter != null) {
-                            adapter.notifyDataSetChanged();
+                        } else {
+                            confirmDeleteModel(model);
                         }
                     })
                     .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
@@ -263,6 +257,31 @@ public class ForkSttSettingsActivity extends BaseFragment {
                 });
             }
         }));
+    }
+
+    private void confirmDeleteModel(final int model) {
+        showDialog(new AlertDialog.Builder(getParentActivity())
+                .setTitle(LocaleController.getString(R.string.ForkSttModelDeleteTitle))
+                .setMessage(LocaleController.getString(R.string.ForkSttModelDeleteMessage))
+                .setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
+                    WhisperModel.delete(model);
+                    // If the model in use was just deleted, fall
+                    // back to another downloaded model if any.
+                    if (!WhisperModel.isSelectedDownloaded()) {
+                        int[] fallbackOrder = new int[]{SharedConfig.FORK_STT_MODEL_BASE, SharedConfig.FORK_STT_MODEL_TINY, SharedConfig.FORK_STT_MODEL_SMALL};
+                        for (int candidate : fallbackOrder) {
+                            if (WhisperModel.isDownloaded(candidate)) {
+                                SharedConfig.setForkSttWhisperModel(candidate);
+                                break;
+                            }
+                        }
+                    }
+                    if (adapter != null) {
+                        adapter.notifyDataSetChanged();
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create());
     }
 
     private String modelRowText(int model) {

@@ -3176,6 +3176,7 @@
     <string name="ForkSttEngineGoogle">Google Cloud Speech-to-Text</string>
     <string name="ForkSttEngineOnDevice">On-device (Whisper)</string>
     <string name="ForkSttModel">On-device model</string>
+    <string name="ForkSttModelUse">Use this model</string>
     <string name="ForkSttModelNotDownloaded">Not downloaded — tap to download (≈57 MB)</string>
     <string name="ForkSttModelDownloading">Downloading model…</string>
     <string name="ForkSttModelDownloadFailed">Could not download the speech model. Check your connection and try again.</string>
@@ -3188,7 +3189,7 @@
     <string name="ForkSttModelSmall">Small</string>
     <string name="ForkSttModelDownloadedWord">Downloaded</string>
     <string name="ForkSttModelNotDownloadedWord">Not downloaded</string>
-    <string name="ForkSttModelsHint">Tiny is the fastest but the weakest, especially for Bengali. Base is balanced and recommended for most voice messages. Small understands Bengali best, but is about 3 times slower than Base. Tap a model to download it or switch to it; tap the model in use to delete it.</string>
+    <string name="ForkSttModelsHint">Tiny is the fastest but the weakest, especially for Bengali. Base is balanced and recommended for most voice messages. Small understands Bengali best, but is about 3 times slower than Base. Tap a model to download it; tap a downloaded model to use it or delete it.</string>
     <string name="ForkSttApiKeysHeader">API keys</string>
     <string name="ForkSttOpenAiKey">OpenAI API key</string>
     <string name="ForkSttGoogleKey">Google Cloud API key</string>
