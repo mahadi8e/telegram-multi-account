@@ -51,6 +51,25 @@ public class DownloadLogStorage extends SQLiteOpenHelper {
 
     private static final DownloadLogStorage[] instances = new DownloadLogStorage[UserConfig.MAX_ACCOUNT_COUNT];
 
+    // TG fork (audit K2): drop this account's download log on logout/login,
+    // so the next account in the slot cannot inherit it.
+    // Called from MessagesController.cleanup().
+    public static void cleanup(int account) {
+        DownloadLogStorage storage;
+        synchronized (DownloadLogStorage.class) {
+            storage = instances[account];
+            instances[account] = null;
+        }
+        if (storage != null) {
+            try {
+                storage.close();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        deleteFiles(account);
+    }
+
     public static synchronized DownloadLogStorage getInstance(int account) {
         DownloadLogStorage storage = instances[account];
         if (storage == null) {
@@ -105,6 +124,30 @@ public class DownloadLogStorage extends SQLiteOpenHelper {
             filesDir.mkdirs();
         }
         return new File(filesDir, DATABASE_NAME);
+    }
+
+    // TG fork (audit K2): delete this account's database files on logout/login,
+    // so the next account in the slot cannot inherit them. Callers must close
+    // the helper first (see controller cleanup).
+    public static void deleteFiles(int account) {
+        try {
+            File dbFile = getDatabaseFile(account);
+            deleteFileQuietly(dbFile);
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-wal"));
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-shm"));
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void deleteFileQuietly(File file) {
+        try {
+            if (file != null && file.exists() && !file.delete()) {
+                file.deleteOnExit();
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
     }
 
     @Override

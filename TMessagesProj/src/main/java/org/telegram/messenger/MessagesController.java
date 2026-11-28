@@ -6429,6 +6429,16 @@ public class MessagesController extends BaseController implements NotificationCe
         getSendMessagesHelper().cleanup();
         getSecretChatHelper().cleanup();
         getLocationController().cleanup();
+        // TG fork (audit K2): cleanup() runs both on logout (performLogout) and
+        // on login (LoginActivity.onAuthSuccess) for the slot — wipe this slot's
+        // fork state so the next account in it cannot inherit vault opt-ins,
+        // local folders, auto-translate dialogs, cached transcriptions or the
+        // download log.
+        ForkDeletedMessagesController.cleanup(currentAccount);
+        LocalFoldersController.cleanup(currentAccount);
+        ForkTranslateController.cleanup(currentAccount);
+        ForkTranscribeController.cleanup(currentAccount);
+        DownloadLogStorage.cleanup(currentAccount);
         getMediaDataController().cleanup();
         getColorPalette().cleanup();
         getTranslateController().cleanup();

@@ -69,6 +69,31 @@ public class ForkTranslateController extends BaseController {
         return localInstance;
     }
 
+    // TG fork (audit K2): logout/login must not leak this account's
+    // auto-translate dialogs and cached translations into the next account
+    // in the slot. Clears the cached sets, closes the storage and deletes
+    // the database files. Called from MessagesController.cleanup().
+    public static void cleanup(int account) {
+        ForkTranslateController controller;
+        synchronized (ForkTranslateController.class) {
+            controller = Instance[account];
+            Instance[account] = null;
+        }
+        if (controller != null) {
+            synchronized (controller) {
+                controller.autoDialogs.clear();
+                controller.autoInFlight.clear();
+                controller.autoLoaded = false;
+            }
+            try {
+                controller.storage.close();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        TranslationsStorage.deleteFiles(account);
+    }
+
     private final TranslationsStorage storage;
     // Fork-owned auto-translate dialogs: dialogId -> target language.
     private final HashMap<Long, String> autoDialogs = new HashMap<>();

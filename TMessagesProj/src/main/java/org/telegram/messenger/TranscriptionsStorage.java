@@ -54,6 +54,30 @@ public class TranscriptionsStorage extends SQLiteOpenHelper {
         return new File(filesDir, DATABASE_NAME);
     }
 
+    // TG fork (audit K2): delete this account's database files on logout/login,
+    // so the next account in the slot cannot inherit them. Callers must close
+    // the helper first (see controller cleanup).
+    public static void deleteFiles(int account) {
+        try {
+            File dbFile = getDatabaseFile(account);
+            deleteFileQuietly(dbFile);
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-wal"));
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-shm"));
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void deleteFileQuietly(File file) {
+        try {
+            if (file != null && file.exists() && !file.delete()) {
+                file.deleteOnExit();
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE " + TABLE_TRANSCRIPTIONS + " (" +

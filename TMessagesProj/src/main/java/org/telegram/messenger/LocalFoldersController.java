@@ -59,6 +59,29 @@ public class LocalFoldersController extends BaseController {
         return -tabId - 2;
     }
 
+    // TG fork (audit K2): logout/login must not leak this account's local
+    // folders and pins into the next account in the slot. Clears the cached
+    // lists, closes the storage and deletes the database files.
+    // Called from MessagesController.cleanup().
+    public static void cleanup(int account) {
+        LocalFoldersController controller;
+        synchronized (LocalFoldersController.class) {
+            controller = Instance[account];
+            Instance[account] = null;
+        }
+        if (controller != null) {
+            controller.folders.clear();
+            controller.pinnedDialogs.clear();
+            controller.loaded = false;
+            try {
+                controller.storage.close();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        LocalFoldersStorage.deleteFiles(account);
+    }
+
     private final LocalFoldersStorage storage;
     private final ArrayList<LocalFolder> folders = new ArrayList<>();
     // Locally pinned dialog ids, most recently pinned first.

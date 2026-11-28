@@ -86,6 +86,46 @@ public class DeletedMessagesStorage extends SQLiteOpenHelper {
         return dir;
     }
 
+    // TG fork (audit K2): delete this account's vault database and retained
+    // media on logout/login, so the next account in the slot cannot inherit
+    // them. Callers must close the helper first (see controller cleanup).
+    public static void deleteFiles(int account) {
+        try {
+            File dbFile = getDatabaseFile(account);
+            deleteFileQuietly(dbFile);
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-wal"));
+            deleteFileQuietly(new File(dbFile.getAbsolutePath() + "-shm"));
+            deleteRecursively(new File(getAccountFilesDir(account), "deleted_media/"));
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void deleteFileQuietly(File file) {
+        try {
+            if (file != null && file.exists() && !file.delete()) {
+                file.deleteOnExit();
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private static void deleteRecursively(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        deleteFileQuietly(file);
+    }
+
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE " + TABLE_DIALOGS + " (" +

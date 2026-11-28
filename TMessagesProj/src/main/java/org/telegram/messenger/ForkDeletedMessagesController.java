@@ -78,6 +78,34 @@ public class ForkDeletedMessagesController extends BaseController {
         return localInstance;
     }
 
+    // TG fork (audit K2): logout/login must not leak this account's fork state
+    // into the next account in the slot. Drops pending queue work, clears the
+    // cached opt-in set, closes the storage and deletes the vault files.
+    // Called from MessagesController.cleanup().
+    public static void cleanup(int account) {
+        ForkDeletedMessagesController controller;
+        synchronized (ForkDeletedMessagesController.class) {
+            controller = Instance[account];
+            Instance[account] = null;
+        }
+        if (controller != null) {
+            controller.queue.cleanupQueue();
+            synchronized (controller.optedInDialogs) {
+                controller.optedInDialogs.clear();
+            }
+            controller.optedInLoaded = false;
+            synchronized (controller.recentlyDeletedByMe) {
+                controller.recentlyDeletedByMe.clear();
+            }
+            try {
+                controller.storage.close();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        DeletedMessagesStorage.deleteFiles(account);
+    }
+
     private final DeletedMessagesStorage storage;
     private final DispatchQueue queue;
     private final HashSet<Long> optedInDialogs = new HashSet<>();

@@ -71,6 +71,28 @@ public class ForkTranscribeController extends BaseController {
         return localInstance;
     }
 
+    // TG fork (audit K2): logout/login must not leak this account's cached
+    // transcriptions into the next account in the slot. Drops pending queue
+    // work, closes the storage and deletes the database files.
+    // Called from MessagesController.cleanup().
+    public static void cleanup(int account) {
+        ForkTranscribeController controller;
+        synchronized (ForkTranscribeController.class) {
+            controller = Instance[account];
+            Instance[account] = null;
+        }
+        if (controller != null) {
+            controller.transcribeQueue.cleanupQueue();
+            controller.pruned = false;
+            try {
+                controller.storage.close();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        TranscriptionsStorage.deleteFiles(account);
+    }
+
     private final TranscriptionsStorage storage;
     private final DispatchQueue transcribeQueue;
     private boolean pruned;
