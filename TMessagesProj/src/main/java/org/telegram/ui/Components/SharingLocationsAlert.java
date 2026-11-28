@@ -184,7 +184,11 @@ public class SharingLocationsAlert extends BottomSheet implements NotificationCe
         pickerBottomLayout.cancelButton.setText(LocaleController.getString(R.string.StopAllLocationSharings));
         pickerBottomLayout.cancelButton.setOnClickListener(view -> {
             for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                LocationController.getInstance(a).removeAllLocationSharings();
+                // TG fork (audit K1): don't create dormant controllers to stop nothing.
+                LocationController controller = LocationController.getInstanceIfExists(a);
+                if (controller != null) {
+                    controller.removeAllLocationSharings();
+                }
             }
             dismiss();
         });
@@ -232,7 +236,12 @@ public class SharingLocationsAlert extends BottomSheet implements NotificationCe
 
     private LocationController.SharingLocationInfo getLocation(int position) {
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            ArrayList<LocationController.SharingLocationInfo> infos = LocationController.getInstance(a).sharingLocationsUI;
+            // TG fork (audit K1): the listed sharings' controllers exist by construction.
+            LocationController controller = LocationController.getInstanceIfExists(a);
+            if (controller == null) {
+                continue;
+            }
+            ArrayList<LocationController.SharingLocationInfo> infos = controller.sharingLocationsUI;
             if (position >= infos.size()) {
                 position -= infos.size();
             } else {

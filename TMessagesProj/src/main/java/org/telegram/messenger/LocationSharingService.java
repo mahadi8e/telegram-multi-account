@@ -47,7 +47,11 @@ public class LocationSharingService extends Service implements NotificationCente
                 for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
                     // TG fork: only logged-in accounts can be sharing a location.
                     if (UserConfig.getInstance(a).isClientActivated()) {
-                        LocationController.getInstance(a).update();
+                        // TG fork (audit K1): don't create dormant controllers on every tick.
+                        LocationController controller = LocationController.getInstanceIfExists(a);
+                        if (controller != null) {
+                            controller.update();
+                        }
                     }
                 }
             });
@@ -92,8 +96,10 @@ public class LocationSharingService extends Service implements NotificationCente
             if (!UserConfig.getInstance(a).isClientActivated()) {
                 continue;
             }
-            ArrayList<LocationController.SharingLocationInfo> arrayList = LocationController.getInstance(a).sharingLocationsUI;
-            if (!arrayList.isEmpty()) {
+            // TG fork (audit K1): don't create dormant controllers for the notification.
+            LocationController controller = LocationController.getInstanceIfExists(a);
+            ArrayList<LocationController.SharingLocationInfo> arrayList = controller != null ? controller.sharingLocationsUI : null;
+            if (arrayList != null && !arrayList.isEmpty()) {
                 infos.addAll(arrayList);
             }
         }
@@ -199,7 +205,12 @@ public class LocationSharingService extends Service implements NotificationCente
             if (!UserConfig.getInstance(a).isClientActivated()) {
                 continue;
             }
-            final ArrayList<LocationController.SharingLocationInfo> infos = LocationController.getInstance(a).sharingLocationsUI;
+            // TG fork (audit K1): don't create dormant controllers for the notification.
+            LocationController controller = LocationController.getInstanceIfExists(a);
+            if (controller == null) {
+                continue;
+            }
+            final ArrayList<LocationController.SharingLocationInfo> infos = controller.sharingLocationsUI;
             for (int i = 0; i < infos.size(); i++) {
                 final LocationController.SharingLocationInfo info = infos.get(i);
                 hasSharings = true;

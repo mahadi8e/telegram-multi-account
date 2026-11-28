@@ -92,6 +92,27 @@ public class LocationController extends BaseController implements NotificationCe
         return localInstance;
     }
 
+    // TG fork (audit K1): peek without creating — the account-loop call sites
+    // must not wake a dormant account's storage just to ask whether it has
+    // sharings.
+    public static LocationController getInstanceIfExists(int num) {
+        return Instance[num];
+    }
+
+    private boolean sharingLocationsLoaded;
+
+    // TG fork (audit K1): the sharing list is loaded from storage only for the
+    // live account, so creating a dormant account's controller does not wake
+    // its MessagesStorage (thread + open DB). Runs again on switch-back via
+    // LaunchActivity.switchToAccount and on resume for the live account.
+    public synchronized void ensureSharingLoaded() {
+        if (sharingLocationsLoaded) {
+            return;
+        }
+        sharingLocationsLoaded = true;
+        loadSharingLocations();
+    }
+
     public static class SharingLocationInfo {
         public long did;
         public int mid;
@@ -164,7 +185,9 @@ public class LocationController extends BaseController implements NotificationCe
             getNotificationCenter().addObserver(locationController, NotificationCenter.messagesDeleted);
             getNotificationCenter().addObserver(locationController, NotificationCenter.replaceMessagesObjects);
         });
-        loadSharingLocations();
+        if (UserConfig.isLiveAccount(currentAccount)) {
+            ensureSharingLoaded();
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -532,6 +555,7 @@ public class LocationController extends BaseController implements NotificationCe
     }
 
     public void cleanup() {
+        sharingLocationsLoaded = false;
         sharingLocationsUI.clear();
         sharingLocationsMapUI.clear();
         locationsCache.clear();
@@ -802,7 +826,15 @@ public class LocationController extends BaseController implements NotificationCe
             if (!UserConfig.getInstance(a).isClientActivated()) {
                 continue;
             }
-            final LocationController controller = getInstance(a);
+            // TG fork (audit K1): create only the live account's controller;
+            // dormant accounts are used only if their controller already exists.
+            final LocationController controller = UserConfig.isLiveAccount(a) ? getInstance(a) : getInstanceIfExists(a);
+            if (controller == null) {
+                continue;
+            }
+            if (UserConfig.isLiveAccount(a)) {
+                controller.ensureSharingLoaded();
+            }
             if (!controller.sharingLocationsUI.isEmpty()) {
                 controller.startService();
                 return;
@@ -995,7 +1027,12 @@ public class LocationController extends BaseController implements NotificationCe
             if (!UserConfig.getInstance(a).isClientActivated()) {
                 continue;
             }
-            count += LocationController.getInstance(a).sharingLocationsUI.size();
+            // TG fork (audit K1): create only the live account's controller;
+            // dormant accounts are counted only if their controller already exists.
+            LocationController controller = UserConfig.isLiveAccount(a) ? getInstance(a) : getInstanceIfExists(a);
+            if (controller != null) {
+                count += controller.sharingLocationsUI.size();
+            }
         }
         return count;
     }

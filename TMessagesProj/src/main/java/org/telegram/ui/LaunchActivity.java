@@ -1239,6 +1239,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         UserConfig.getInstance(account).tgBacklogCutoff = ConnectionsManager.getInstance(account).getCurrentTime();
         UserConfig.getInstance(account).saveConfig(false);
 
+        // TG fork (audit K1): the newly live account's sharing list was never
+        // loaded while it was dormant — load it now so its live-location
+        // service resumes on switch-back.
+        LocationController.getInstance(account).ensureSharingLoaded();
+
         checkCurrentAccount();
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.activeAccountChanged, account);
         if (AndroidUtilities.isTablet()) {

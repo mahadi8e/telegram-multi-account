@@ -721,7 +721,11 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
                 builder.setPositiveButton(getString(R.string.Stop), (dialogInterface, i) -> {
                     if (fragment instanceof DialogsActivity) {
                         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                            LocationController.getInstance(a).removeAllLocationSharings();
+                            // TG fork (audit K1): don't create dormant controllers to stop nothing.
+                            LocationController controller = LocationController.getInstanceIfExists(a);
+                            if (controller != null) {
+                                controller.removeAllLocationSharings();
+                            }
                         }
                     } else {
                         LocationController.getInstance(fragment.getCurrentAccount()).removeSharingLocation(chatActivity.getDialogId());
@@ -805,9 +809,11 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
                     account = fragment.getCurrentAccount();
                 } else if (LocationController.getLocationsCount() == 1) {
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                        ArrayList<LocationController.SharingLocationInfo> arrayList = LocationController.getInstance(a).sharingLocationsUI;
-                        if (!arrayList.isEmpty()) {
-                            LocationController.SharingLocationInfo info = LocationController.getInstance(a).sharingLocationsUI.get(0);
+                        // TG fork (audit K1): the one sharing's controller exists by construction.
+                        LocationController controller = LocationController.getInstanceIfExists(a);
+                        ArrayList<LocationController.SharingLocationInfo> arrayList = controller != null ? controller.sharingLocationsUI : null;
+                        if (arrayList != null && !arrayList.isEmpty()) {
+                            LocationController.SharingLocationInfo info = arrayList.get(0);
                             did = info.did;
                             account = info.messageObject.currentAccount;
                             break;
@@ -1717,7 +1723,11 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
                 String str;
                 ArrayList<LocationController.SharingLocationInfo> infos = new ArrayList<>();
                 for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-                    infos.addAll(LocationController.getInstance(a).sharingLocationsUI);
+                    // TG fork (audit K1): don't create dormant controllers to build the bar text.
+                    LocationController controller = LocationController.getInstanceIfExists(a);
+                    if (controller != null) {
+                        infos.addAll(controller.sharingLocationsUI);
+                    }
                 }
                 if (infos.size() == 1) {
                     LocationController.SharingLocationInfo info = infos.get(0);
